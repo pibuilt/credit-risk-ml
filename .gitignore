@@ -1,3 +1,10 @@
-venv/
+# Python cache
 __pycache__/
 *.pyc
+
+# Virtual environment
+venv/
+
+# Dataset files
+data/*
+!data/.gitkeep
