@@ -105,6 +105,42 @@ def remove_leakage_columns(df, logger):
 
     return df
 
+def drop_high_missing_columns(df, logger):
+
+    logger.info("Checking missing value percentages")
+
+    missing_pct = df.isnull().mean()
+
+    high_missing_cols = missing_pct[missing_pct > 0.9].index.tolist()
+
+    logger.info(f"Columns with >90% missing: {len(high_missing_cols)}")
+
+    print(high_missing_cols)
+
+    df = df.drop(columns=high_missing_cols)
+
+    logger.info(f"Remaining columns after drop: {df.shape[1]}")
+
+    return df
+
+def drop_moderate_missing_columns(df, logger):
+
+    logger.info("Dropping columns with >50% missing values")
+
+    missing_pct = df.isnull().mean()
+
+    cols_to_drop = missing_pct[missing_pct > 0.5].index.tolist()
+
+    logger.info(f"Columns to drop: {len(cols_to_drop)}")
+
+    print(cols_to_drop)
+
+    df = df.drop(columns=cols_to_drop)
+
+    logger.info(f"Remaining columns: {df.shape[1]}")
+
+    return df
+
 
 def main():
 
@@ -119,6 +155,10 @@ def main():
     df = prepare_target(df, logger)
 
     df = remove_leakage_columns(df, logger)
+
+    df = drop_high_missing_columns(df, logger)
+
+    df = drop_moderate_missing_columns(df, logger)
 
 
 if __name__ == "__main__":
