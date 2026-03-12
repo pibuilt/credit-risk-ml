@@ -4,6 +4,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.impute import SimpleImputer
 from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.preprocessing import FunctionTransformer
 
 def get_feature_groups(df, logger):
 
@@ -70,7 +71,14 @@ def build_preprocessing_pipeline(
 
         text_pipeline = Pipeline(
             steps=[
-                ("tfidf", TfidfVectorizer(max_features=500))
+                (
+                    "fillna",
+                    FunctionTransformer(
+                        lambda x: x.fillna("").astype(str),
+                        validate=False
+                    ),
+                ),
+                ("tfidf", TfidfVectorizer(max_features=500)),
             ]
         )
 
