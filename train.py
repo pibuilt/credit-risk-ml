@@ -4,6 +4,9 @@ import pandas as pd
 from explore_data import prepare_target
 from features import get_feature_groups, build_preprocessing_pipeline
 
+from sklearn.pipeline import Pipeline
+from sklearn.linear_model import LogisticRegression
+
 
 def setup_logging():
     logging.basicConfig(
@@ -58,6 +61,22 @@ def main():
     logger.info("Feature pipeline ready")
 
     logger.info("Training pipeline initialization complete")
+
+    logger.info("Creating ML pipeline")
+
+    model = LogisticRegression(
+        max_iter=1000,
+        class_weight="balanced"
+    )
+
+    pipeline = Pipeline(
+        steps=[
+            ("preprocessing", preprocessor),
+            ("model", model)
+        ]
+    )
+
+    logger.info("ML pipeline created")
 
 
 if __name__ == "__main__":
