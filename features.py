@@ -1,5 +1,9 @@
 import logging
-
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.impute import SimpleImputer
+from sklearn.feature_extraction.text import TfidfVectorizer
 
 def get_feature_groups(df, logger):
 
@@ -32,3 +36,53 @@ def get_feature_groups(df, logger):
     logger.info(f"Text features: {len(text_features)}")
 
     return numeric_features, categorical_features, text_features
+
+def build_preprocessing_pipeline(
+    numeric_features,
+    categorical_features,
+    text_features,
+    logger
+):
+
+    logger.info("Building preprocessing pipeline")
+
+    numeric_pipeline = Pipeline(
+        steps=[
+            ("imputer", SimpleImputer(strategy="median")),
+            ("scaler", StandardScaler()),
+        ]
+    )
+
+    categorical_pipeline = Pipeline(
+        steps=[
+            ("imputer", SimpleImputer(strategy="most_frequent")),
+            ("encoder", OneHotEncoder(handle_unknown="ignore")),
+        ]
+    )
+
+    transformers = [
+        ("num", numeric_pipeline, numeric_features),
+        ("cat", categorical_pipeline, categorical_features),
+    ]
+
+    # add text pipelines
+    for text_col in text_features:
+
+        text_pipeline = Pipeline(
+            steps=[
+                ("tfidf", TfidfVectorizer(max_features=500))
+            ]
+        )
+
+        transformers.append(
+            (f"text_{text_col}", text_pipeline, text_col)
+        )
+
+    preprocessor = ColumnTransformer(
+        transformers=transformers,
+        remainder="drop"
+    )
+
+    logger.info("Preprocessing pipeline created")
+
+    return preprocessor
