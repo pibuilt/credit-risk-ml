@@ -10,7 +10,7 @@ from features import get_feature_groups, build_preprocessing_pipeline
 from sklearn.pipeline import Pipeline
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import roc_auc_score, average_precision_score, f1_score, confusion_matrix, roc_curve, precision_recall_curve
+from sklearn.metrics import roc_auc_score, average_precision_score, f1_score, confusion_matrix, roc_curve, precision_recall_curve, brier_score_loss
 
 def setup_logging():
     logging.basicConfig(
@@ -116,17 +116,21 @@ def evaluate_model(y_true, y_pred, y_prob, logger):
 
     cm = confusion_matrix(y_true, y_pred)
 
+    brier = brier_score_loss(y_true, y_prob)
+
     logger.info(f"ROC-AUC: {roc_auc:.4f}")
     logger.info(f"PR-AUC: {pr_auc:.4f}")
     logger.info(f"F1 Score: {f1:.4f}")
-
     logger.info(f"Confusion Matrix:\n{cm}")
+    logger.info(f"Brier Score: {brier:.4f}")
 
     return {
         "roc_auc": float(roc_auc),
         "pr_auc": float(pr_auc),
         "f1_score": float(f1),
         "confusion_matrix": cm.tolist(),
+        "brier_score": float(brier)
+
     }
 
 def save_metrics(metrics, logger):
