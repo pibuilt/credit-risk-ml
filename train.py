@@ -7,6 +7,7 @@ from features import get_feature_groups, build_preprocessing_pipeline
 from sklearn.pipeline import Pipeline
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import roc_auc_score, average_precision_score, f1_score, confusion_matrix
 
 def setup_logging():
     logging.basicConfig(
@@ -95,6 +96,30 @@ def split_dataset(X, y, logger):
 
     return X_train, X_val, X_test, y_train, y_val, y_test
 
+def evaluate_model(y_true, y_pred, y_prob, logger):
+
+    logger.info("Evaluating model")
+
+    roc_auc = roc_auc_score(y_true, y_prob)
+
+    pr_auc = average_precision_score(y_true, y_prob)
+
+    f1 = f1_score(y_true, y_pred)
+
+    cm = confusion_matrix(y_true, y_pred)
+
+    logger.info(f"ROC-AUC: {roc_auc:.4f}")
+    logger.info(f"PR-AUC: {pr_auc:.4f}")
+    logger.info(f"F1 Score: {f1:.4f}")
+
+    logger.info(f"Confusion Matrix:\n{cm}")
+
+    return {
+        "roc_auc": float(roc_auc),
+        "pr_auc": float(pr_auc),
+        "f1_score": float(f1),
+        "confusion_matrix": cm.tolist(),
+    }
 
 def main():
 
@@ -113,8 +138,6 @@ def main():
     X = df.drop(columns=["default"])
     y = df["default"]
 
-    logger.info(f"Feature matrix shape: {X.shape}")
-
     # create stratified splits
     X_train, X_val, X_test, y_train, y_val, y_test = split_dataset(X, y, logger)
 
@@ -122,7 +145,7 @@ def main():
 
     # identify feature groups
     numeric_features, categorical_features, text_features = get_feature_groups(
-        X, logger
+        X_train, logger
     )
 
     # build preprocessing pipeline
@@ -158,6 +181,18 @@ def main():
     pipeline.fit(X_train, y_train)
 
     logger.info("Model training complete")
+
+    logger.info("Running validation evaluation")
+
+    val_predictions = pipeline.predict(X_val)
+    val_probabilities = pipeline.predict_proba(X_val)[:, 1]
+
+    metrics = evaluate_model(
+        y_val,
+        val_predictions,
+        val_probabilities,
+        logger
+    )
 
     logger.info("Generating sample predictions")
 
