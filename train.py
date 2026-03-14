@@ -53,6 +53,11 @@ def clean_dataset(df, logger):
         "last_credit_pull_d",
         "last_fico_range_high",
         "last_fico_range_low",
+        "grade",
+        "sub_grade",
+        "int_rate",
+        "issue_d",
+        "earliest_cr_line"
     ]
 
     df = df.drop(columns=[c for c in leakage_cols if c in df.columns])
@@ -178,8 +183,10 @@ def main():
     df = clean_dataset(df, logger)
 
     # split features and target
-    X = df.drop(columns=["default"])
+    X = df.drop(columns=["default", "loan_status"])
     y = df["default"]
+
+    logger.info(f"Columns in X: {list(X.columns)[:10]}")
 
     # create stratified splits
     X_train, X_val, X_test, y_train, y_val, y_test = split_dataset(X, y, logger)
