@@ -197,6 +197,32 @@ def plot_roc_curve(y_true, y_prob, logger):
 
     logger.info(f"ROC curve saved to {path}")
 
+def plot_pr_curve(y_true, y_prob, logger):
+
+    if not os.path.exists("reports"):
+        os.makedirs("reports")
+
+    precision, recall, _ = precision_recall_curve(y_true, y_prob)
+
+    plt.figure()
+
+    plt.plot(recall, precision, label="Model")
+
+    plt.xlabel("Recall")
+    plt.ylabel("Precision")
+
+    plt.title("Precision-Recall Curve")
+
+    plt.legend()
+
+    path = "reports/pr_curve.png"
+
+    plt.savefig(path)
+
+    plt.close()
+
+    logger.info(f"PR curve saved to {path}")
+
 def main():
 
     logger = logging.getLogger(__name__)
@@ -277,6 +303,8 @@ def main():
     plot_confusion_matrix(metrics["confusion_matrix"], logger)
 
     plot_roc_curve(y_val, val_probabilities, logger)
+
+    plot_pr_curve(y_val, val_probabilities, logger)
 
     logger.info("Generating sample predictions")
 
