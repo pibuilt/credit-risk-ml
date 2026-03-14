@@ -1,5 +1,8 @@
 import logging
 import pandas as pd
+import json
+import os
+import matplotlib.pyplot as plt
 
 from explore_data import prepare_target
 from features import get_feature_groups, build_preprocessing_pipeline
@@ -7,7 +10,7 @@ from features import get_feature_groups, build_preprocessing_pipeline
 from sklearn.pipeline import Pipeline
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import roc_auc_score, average_precision_score, f1_score, confusion_matrix
+from sklearn.metrics import roc_auc_score, average_precision_score, f1_score, confusion_matrix, roc_curve, precision_recall_curve
 
 def setup_logging():
     logging.basicConfig(
@@ -121,6 +124,46 @@ def evaluate_model(y_true, y_pred, y_prob, logger):
         "confusion_matrix": cm.tolist(),
     }
 
+def save_metrics(metrics, logger):
+
+    if not os.path.exists("reports"):
+        os.makedirs("reports")
+
+    path = "reports/metrics.json"
+
+    with open(path, "w") as f:
+        json.dump(metrics, f, indent=4)
+
+    logger.info(f"Metrics saved to {path}")
+
+def plot_confusion_matrix(cm, logger):
+
+    if not os.path.exists("reports"):
+        os.makedirs("reports")
+
+    plt.figure()
+
+    plt.imshow(cm, interpolation="nearest")
+
+    plt.title("Confusion Matrix")
+
+    plt.colorbar()
+
+    plt.xlabel("Predicted Label")
+    plt.ylabel("True Label")
+
+    for i in range(len(cm)):
+        for j in range(len(cm[0])):
+            plt.text(j, i, cm[i][j], ha="center", va="center")
+
+    path = "reports/confusion_matrix.png"
+
+    plt.savefig(path)
+
+    plt.close()
+
+    logger.info(f"Confusion matrix saved to {path}")
+
 def main():
 
     logger = logging.getLogger(__name__)
@@ -193,6 +236,10 @@ def main():
         val_probabilities,
         logger
     )
+
+    save_metrics(metrics, logger)
+
+    plot_confusion_matrix(metrics["confusion_matrix"], logger)
 
     logger.info("Generating sample predictions")
 
