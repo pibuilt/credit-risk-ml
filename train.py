@@ -6,7 +6,7 @@ from features import get_feature_groups, build_preprocessing_pipeline
 
 from sklearn.pipeline import Pipeline
 from sklearn.linear_model import LogisticRegression
-
+from sklearn.model_selection import train_test_split
 
 def setup_logging():
     logging.basicConfig(
@@ -67,6 +67,34 @@ def clean_dataset(df, logger):
 
     return df
 
+def split_dataset(X, y, logger):
+
+    logger.info("Creating train/validation/test split")
+
+    # 70% train, 30% temp
+    X_train, X_temp, y_train, y_temp = train_test_split(
+        X,
+        y,
+        test_size=0.30,
+        stratify=y,
+        random_state=42
+    )
+
+    # split remaining 30% into validation + test
+    X_val, X_test, y_val, y_test = train_test_split(
+        X_temp,
+        y_temp,
+        test_size=0.50,
+        stratify=y_temp,
+        random_state=42
+    )
+
+    logger.info(f"Train set shape: {X_train.shape}")
+    logger.info(f"Validation set shape: {X_val.shape}")
+    logger.info(f"Test set shape: {X_test.shape}")
+
+    return X_train, X_val, X_test, y_train, y_val, y_test
+
 
 def main():
 
@@ -84,6 +112,11 @@ def main():
     # split features and target
     X = df.drop(columns=["default"])
     y = df["default"]
+
+    logger.info(f"Feature matrix shape: {X.shape}")
+
+    # create stratified splits
+    X_train, X_val, X_test, y_train, y_val, y_test = split_dataset(X, y, logger)
 
     logger.info(f"Feature matrix shape: {X.shape}")
 
@@ -122,14 +155,14 @@ def main():
 
     logger.info("Training baseline model")
 
-    pipeline.fit(X, y)
+    pipeline.fit(X_train, y_train)
 
     logger.info("Model training complete")
 
     logger.info("Generating sample predictions")
 
-    predictions = pipeline.predict(X[:5])
-    probabilities = pipeline.predict_proba(X[:5])[:, 1]
+    predictions = pipeline.predict(X_test[:5])
+    probabilities = pipeline.predict_proba(X_test[:5])[:, 1]
 
     logger.info(f"Sample predictions: {predictions}")
     logger.info(f"Sample probabilities: {probabilities}")
