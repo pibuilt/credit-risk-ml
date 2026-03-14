@@ -169,6 +169,34 @@ def plot_confusion_matrix(cm, logger):
 
     logger.info(f"Confusion matrix saved to {path}")
 
+def plot_roc_curve(y_true, y_prob, logger):
+
+    if not os.path.exists("reports"):
+        os.makedirs("reports")
+
+    fpr, tpr, _ = roc_curve(y_true, y_prob)
+
+    plt.figure()
+
+    plt.plot(fpr, tpr, label="Model")
+
+    plt.plot([0, 1], [0, 1], linestyle="--", label="Random")
+
+    plt.xlabel("False Positive Rate")
+    plt.ylabel("True Positive Rate")
+
+    plt.title("ROC Curve")
+
+    plt.legend()
+
+    path = "reports/roc_curve.png"
+
+    plt.savefig(path)
+
+    plt.close()
+
+    logger.info(f"ROC curve saved to {path}")
+
 def main():
 
     logger = logging.getLogger(__name__)
@@ -247,6 +275,8 @@ def main():
     save_metrics(metrics, logger)
 
     plot_confusion_matrix(metrics["confusion_matrix"], logger)
+
+    plot_roc_curve(y_val, val_probabilities, logger)
 
     logger.info("Generating sample predictions")
 
