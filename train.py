@@ -29,6 +29,45 @@ def load_dataset(logger):
     return df
 
 
+def clean_dataset(df, logger):
+
+    logger.info("Removing leakage columns")
+
+    leakage_cols = [
+        "out_prncp",
+        "out_prncp_inv",
+        "total_pymnt",
+        "total_pymnt_inv",
+        "total_rec_prncp",
+        "total_rec_int",
+        "total_rec_late_fee",
+        "recoveries",
+        "collection_recovery_fee",
+        "last_pymnt_amnt",
+        "last_pymnt_d",
+        "next_pymnt_d",
+        "last_credit_pull_d",
+        "last_fico_range_high",
+        "last_fico_range_low",
+    ]
+
+    df = df.drop(columns=[c for c in leakage_cols if c in df.columns])
+
+    logger.info("Dropping columns with >50% missing values")
+
+    missing_pct = df.isnull().mean()
+
+    cols_to_drop = missing_pct[missing_pct > 0.5].index.tolist()
+
+    logger.info(f"Columns dropped: {len(cols_to_drop)}")
+
+    df = df.drop(columns=cols_to_drop)
+
+    logger.info(f"Dataset shape after cleaning: {df.shape}")
+
+    return df
+
+
 def main():
 
     logger = logging.getLogger(__name__)
@@ -38,6 +77,9 @@ def main():
 
     # prepare target
     df = prepare_target(df, logger)
+
+    # clean dataset (Day 4 Step 1)
+    df = clean_dataset(df, logger)
 
     # split features and target
     X = df.drop(columns=["default"])
@@ -77,6 +119,20 @@ def main():
     )
 
     logger.info("ML pipeline created")
+
+    logger.info("Training baseline model")
+
+    pipeline.fit(X, y)
+
+    logger.info("Model training complete")
+
+    logger.info("Generating sample predictions")
+
+    predictions = pipeline.predict(X[:5])
+    probabilities = pipeline.predict_proba(X[:5])[:, 1]
+
+    logger.info(f"Sample predictions: {predictions}")
+    logger.info(f"Sample probabilities: {probabilities}")
 
 
 if __name__ == "__main__":
