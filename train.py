@@ -251,6 +251,12 @@ def main():
     # create stratified splits
     X_train, X_val, X_test, y_train, y_val, y_test = split_dataset(X, y, logger)
 
+    cv = StratifiedKFold(
+    n_splits=5,
+    shuffle=True,
+    random_state=42
+    )
+
     logger.info(f"Feature matrix shape: {X.shape}")
 
     # identify feature groups
