@@ -7,6 +7,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.preprocessing import FunctionTransformer
 from sklearn.cluster import KMeans
 
+
 def get_feature_groups(df, logger):
 
     logger.info("Identifying feature groups")
@@ -33,11 +34,17 @@ def get_feature_groups(df, logger):
     if "default" in numeric_features:
         numeric_features.remove("default")
 
+    # ensure risk_cluster is treated as categorical
+    if "risk_cluster" in numeric_features:
+        numeric_features.remove("risk_cluster")
+        categorical_features.append("risk_cluster")
+
     logger.info(f"Numeric features: {len(numeric_features)}")
     logger.info(f"Categorical features: {len(categorical_features)}")
     logger.info(f"Text features: {len(text_features)}")
 
     return numeric_features, categorical_features, text_features
+
 
 def build_preprocessing_pipeline(
     numeric_features,
@@ -96,6 +103,7 @@ def build_preprocessing_pipeline(
 
     return preprocessor
 
+
 def generate_risk_clusters(X_train, X_val, X_test, numeric_features, n_clusters=5):
     """
     Train a KMeans clustering model on numeric borrower features
@@ -120,7 +128,7 @@ def generate_risk_clusters(X_train, X_val, X_test, numeric_features, n_clusters=
     X_train = X_train.copy()
     X_val = X_val.copy()
     X_test = X_test.copy()
-    
+
     X_train["risk_cluster"] = kmeans.predict(X_train[numeric_features])
     X_val["risk_cluster"] = kmeans.predict(X_val[numeric_features])
     X_test["risk_cluster"] = kmeans.predict(X_test[numeric_features])
