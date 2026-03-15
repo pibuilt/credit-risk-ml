@@ -5,6 +5,7 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.impute import SimpleImputer
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.preprocessing import FunctionTransformer
+from sklearn.clusters import KMeans
 
 def get_feature_groups(df, logger):
 
@@ -94,3 +95,32 @@ def build_preprocessing_pipeline(
     logger.info("Preprocessing pipeline created")
 
     return preprocessor
+
+def generate_risk_clusters(X_train, X_val, X_test, numeric_features, n_clusters=5):
+    """
+    Train a KMeans clustering model on numeric borrower features
+    and create a new feature called 'risk_cluster'.
+    """
+
+    logger = logging.getLogger(__name__)
+
+    logger.info("Training KMeans risk clustering model")
+
+    kmeans = KMeans(
+        n_clusters=n_clusters,
+        random_state=42,
+        n_init=10
+    )
+
+    # Fit clustering on training data only
+    kmeans.fit(X_train[numeric_features])
+
+    logger.info("Assigning risk clusters")
+
+    X_train["risk_cluster"] = kmeans.predict(X_train[numeric_features])
+    X_val["risk_cluster"] = kmeans.predict(X_val[numeric_features])
+    X_test["risk_cluster"] = kmeans.predict(X_test[numeric_features])
+
+    logger.info("Risk clustering completed")
+
+    return X_train, X_val, X_test
