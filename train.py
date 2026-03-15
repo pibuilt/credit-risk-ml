@@ -5,7 +5,11 @@ import os
 import matplotlib.pyplot as plt
 
 from explore_data import prepare_target
-from features import get_feature_groups, build_preprocessing_pipeline
+from features import (
+    get_feature_groups,
+    build_preprocessing_pipeline,
+    generate_risk_clusters
+)
 
 from sklearn.pipeline import Pipeline
 from sklearn.linear_model import LogisticRegression
@@ -13,6 +17,7 @@ from sklearn.model_selection import train_test_split, StratifiedKFold
 from sklearn.metrics import roc_auc_score, average_precision_score, f1_score, confusion_matrix, roc_curve, precision_recall_curve, brier_score_loss
 from sklearn.ensemble import RandomForestClassifier
 from lightgbm import LGBMClassifier
+
 
 def setup_logging():
     logging.basicConfig(
@@ -78,11 +83,11 @@ def clean_dataset(df, logger):
 
     return df
 
+
 def split_dataset(X, y, logger):
 
     logger.info("Creating train/validation/test split")
 
-    # 70% train, 30% temp
     X_train, X_temp, y_train, y_temp = train_test_split(
         X,
         y,
@@ -91,7 +96,6 @@ def split_dataset(X, y, logger):
         random_state=42
     )
 
-    # split remaining 30% into validation + test
     X_val, X_test, y_val, y_test = train_test_split(
         X_temp,
         y_temp,
@@ -106,18 +110,15 @@ def split_dataset(X, y, logger):
 
     return X_train, X_val, X_test, y_train, y_val, y_test
 
+
 def evaluate_model(y_true, y_pred, y_prob, logger):
 
     logger.info("Evaluating model")
 
     roc_auc = roc_auc_score(y_true, y_prob)
-
     pr_auc = average_precision_score(y_true, y_prob)
-
     f1 = f1_score(y_true, y_pred)
-
     cm = confusion_matrix(y_true, y_pred)
-
     brier = brier_score_loss(y_true, y_prob)
 
     logger.info(f"ROC-AUC: {roc_auc:.4f}")
@@ -132,8 +133,8 @@ def evaluate_model(y_true, y_pred, y_prob, logger):
         "f1_score": float(f1),
         "confusion_matrix": cm.tolist(),
         "brier_score": float(brier)
-
     }
+
 
 def save_metrics(metrics, logger):
 
@@ -146,6 +147,7 @@ def save_metrics(metrics, logger):
         json.dump(metrics, f, indent=4)
 
     logger.info(f"Metrics saved to {path}")
+
 
 def plot_confusion_matrix(cm, logger):
 
@@ -175,6 +177,7 @@ def plot_confusion_matrix(cm, logger):
 
     logger.info(f"Confusion matrix saved to {path}")
 
+
 def plot_roc_curve(y_true, y_prob, logger):
 
     if not os.path.exists("reports"):
@@ -203,6 +206,7 @@ def plot_roc_curve(y_true, y_prob, logger):
 
     logger.info(f"ROC curve saved to {path}")
 
+
 def plot_pr_curve(y_true, y_prob, logger):
 
     if not os.path.exists("reports"):
@@ -229,37 +233,48 @@ def plot_pr_curve(y_true, y_prob, logger):
 
     logger.info(f"PR curve saved to {path}")
 
+
 def main():
 
     logger = logging.getLogger(__name__)
 
-    # load dataset
     df = load_dataset(logger)
 
-    # prepare target
     df = prepare_target(df, logger)
 
-    # clean dataset (Day 4 Step 1)
     df = clean_dataset(df, logger)
 
-    # split features and target
     X = df.drop(columns=["default", "loan_status"])
     y = df["default"]
 
     logger.info(f"Sample feature columns: {list(X.columns)[:10]}")
 
-    # create stratified splits
     X_train, X_val, X_test, y_train, y_val, y_test = split_dataset(X, y, logger)
 
     cv = StratifiedKFold(
-    n_splits=5,
-    shuffle=True,
-    random_state=42
+        n_splits=5,
+        shuffle=True,
+        random_state=42
     )
 
     logger.info(f"Feature matrix shape: {X.shape}")
 
     # identify feature groups
+    numeric_features, categorical_features, text_features = get_feature_groups(
+        X_train, logger
+    )
+
+    # generate risk clusters
+    logger.info("Generating risk clusters using KMeans")
+
+    X_train, X_val, X_test = generate_risk_clusters(
+        X_train,
+        X_val,
+        X_test,
+        numeric_features
+    )
+
+    # re-detect feature groups (now includes risk_cluster)
     numeric_features, categorical_features, text_features = get_feature_groups(
         X_train, logger
     )
@@ -274,23 +289,21 @@ def main():
 
     models = {
         "logistic_regression": LogisticRegression(
-        max_iter=1000,
-        class_weight="balanced"
-    ),
-
+            max_iter=1000,
+            class_weight="balanced"
+        ),
         "random_forest": RandomForestClassifier(
-        n_estimators=200,
-        n_jobs=-1,
-        class_weight="balanced"
-    ),
-
+            n_estimators=200,
+            n_jobs=-1,
+            class_weight="balanced"
+        ),
         "lightgbm": LGBMClassifier(
-        n_estimators=300,
-        learning_rate=0.05,
-        num_leaves=31,
-        class_weight="balanced"
-    )
-}
+            n_estimators=300,
+            learning_rate=0.05,
+            num_leaves=31,
+            class_weight="balanced"
+        )
+    }
 
     logger.info("Feature pipeline ready")
 
@@ -347,7 +360,7 @@ def main():
 
     if best_model_name is None:
         raise RuntimeError("No model was selected during cross-validation")
-    
+
     best_model = models[best_model_name]
 
     logger.info("Training best model on full training data")
@@ -378,9 +391,7 @@ def main():
     save_metrics(metrics, logger)
 
     plot_confusion_matrix(metrics["confusion_matrix"], logger)
-
     plot_roc_curve(y_val, val_probabilities, logger)
-
     plot_pr_curve(y_val, val_probabilities, logger)
 
     logger.info("Generating sample predictions")
@@ -390,6 +401,7 @@ def main():
 
     logger.info(f"Sample predictions: {predictions}")
     logger.info(f"Sample probabilities: {probabilities}")
+
 
 if __name__ == "__main__":
     setup_logging()
