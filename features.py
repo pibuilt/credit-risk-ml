@@ -5,7 +5,7 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.impute import SimpleImputer
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.preprocessing import FunctionTransformer
-from sklearn.clusters import KMeans
+from sklearn.cluster import KMeans
 
 def get_feature_groups(df, logger):
 
@@ -117,6 +117,10 @@ def generate_risk_clusters(X_train, X_val, X_test, numeric_features, n_clusters=
 
     logger.info("Assigning risk clusters")
 
+    X_train = X_train.copy()
+    X_val = X_val.copy()
+    X_test = X_test.copy()
+    
     X_train["risk_cluster"] = kmeans.predict(X_train[numeric_features])
     X_val["risk_cluster"] = kmeans.predict(X_val[numeric_features])
     X_test["risk_cluster"] = kmeans.predict(X_test[numeric_features])
