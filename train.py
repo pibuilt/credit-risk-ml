@@ -9,8 +9,10 @@ from features import get_feature_groups, build_preprocessing_pipeline
 
 from sklearn.pipeline import Pipeline
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, StratifiedKFold
 from sklearn.metrics import roc_auc_score, average_precision_score, f1_score, confusion_matrix, roc_curve, precision_recall_curve, brier_score_loss
+from sklearn.ensemble import RandomForestClassifier
+from lightgbm import LGBMClassifier
 
 def setup_logging():
     logging.basicConfig(
