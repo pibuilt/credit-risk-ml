@@ -8,3 +8,5 @@ venv/
 # Dataset files
 data/*
 !data/.gitkeep
+
+reports/

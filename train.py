@@ -9,8 +9,10 @@ from features import get_feature_groups, build_preprocessing_pipeline
 
 from sklearn.pipeline import Pipeline
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, StratifiedKFold
 from sklearn.metrics import roc_auc_score, average_precision_score, f1_score, confusion_matrix, roc_curve, precision_recall_curve, brier_score_loss
+from sklearn.ensemble import RandomForestClassifier
+from lightgbm import LGBMClassifier
 
 def setup_logging():
     logging.basicConfig(
@@ -244,10 +246,16 @@ def main():
     X = df.drop(columns=["default", "loan_status"])
     y = df["default"]
 
-    logger.info(f"Columns in X: {list(X.columns)[:10]}")
+    logger.info(f"Sample feature columns: {list(X.columns)[:10]}")
 
     # create stratified splits
     X_train, X_val, X_test, y_train, y_val, y_test = split_dataset(X, y, logger)
+
+    cv = StratifiedKFold(
+    n_splits=5,
+    shuffle=True,
+    random_state=42
+    )
 
     logger.info(f"Feature matrix shape: {X.shape}")
 
@@ -264,36 +272,101 @@ def main():
         logger
     )
 
-    logger.info("Feature pipeline ready")
-
-    logger.info("Training pipeline initialization complete")
-
-    logger.info("Creating ML pipeline")
-
-    model = LogisticRegression(
+    models = {
+        "logistic_regression": LogisticRegression(
         max_iter=1000,
         class_weight="balanced"
-    )
+    ),
 
-    pipeline = Pipeline(
+        "random_forest": RandomForestClassifier(
+        n_estimators=200,
+        n_jobs=-1,
+        class_weight="balanced"
+    ),
+
+        "lightgbm": LGBMClassifier(
+        n_estimators=300,
+        learning_rate=0.05,
+        num_leaves=31,
+        class_weight="balanced"
+    )
+}
+
+    logger.info("Feature pipeline ready")
+
+    logger.info("Starting model comparison with cross-validation")
+
+    best_model_name = None
+    best_score = 0
+
+    for model_name, model in models.items():
+
+        logger.info(f"Training model: {model_name}")
+
+        pipeline = Pipeline(
+            steps=[
+                ("preprocessing", preprocessor),
+                ("model", model)
+            ]
+        )
+
+        roc_scores = []
+        pr_scores = []
+
+        for fold, (train_idx, val_idx) in enumerate(cv.split(X_train, y_train)):
+
+            logger.info(f"{model_name} | Fold {fold + 1}")
+
+            X_tr = X_train.iloc[train_idx]
+            y_tr = y_train.iloc[train_idx]
+
+            X_val_fold = X_train.iloc[val_idx]
+            y_val_fold = y_train.iloc[val_idx]
+
+            pipeline.fit(X_tr, y_tr)
+
+            preds = pipeline.predict_proba(X_val_fold)[:, 1]
+
+            roc = roc_auc_score(y_val_fold, preds)
+            pr = average_precision_score(y_val_fold, preds)
+
+            roc_scores.append(roc)
+            pr_scores.append(pr)
+
+        mean_roc = sum(roc_scores) / len(roc_scores)
+        mean_pr = sum(pr_scores) / len(pr_scores)
+
+        logger.info(f"{model_name} | Mean ROC-AUC: {mean_roc:.4f}")
+        logger.info(f"{model_name} | Mean PR-AUC: {mean_pr:.4f}")
+
+        if mean_pr > best_score:
+            best_score = mean_pr
+            best_model_name = model_name
+
+    logger.info(f"Best model selected: {best_model_name}")
+
+    if best_model_name is None:
+        raise RuntimeError("No model was selected during cross-validation")
+    
+    best_model = models[best_model_name]
+
+    logger.info("Training best model on full training data")
+
+    final_pipeline = Pipeline(
         steps=[
             ("preprocessing", preprocessor),
-            ("model", model)
+            ("model", best_model)
         ]
     )
 
-    logger.info("ML pipeline created")
-
-    logger.info("Training baseline model")
-
-    pipeline.fit(X_train, y_train)
+    final_pipeline.fit(X_train, y_train)
 
     logger.info("Model training complete")
 
     logger.info("Running validation evaluation")
 
-    val_predictions = pipeline.predict(X_val)
-    val_probabilities = pipeline.predict_proba(X_val)[:, 1]
+    val_predictions = final_pipeline.predict(X_val)
+    val_probabilities = final_pipeline.predict_proba(X_val)[:, 1]
 
     metrics = evaluate_model(
         y_val,
@@ -312,12 +385,11 @@ def main():
 
     logger.info("Generating sample predictions")
 
-    predictions = pipeline.predict(X_test[:5])
-    probabilities = pipeline.predict_proba(X_test[:5])[:, 1]
+    predictions = final_pipeline.predict(X_test[:5])
+    probabilities = final_pipeline.predict_proba(X_test[:5])[:, 1]
 
     logger.info(f"Sample predictions: {predictions}")
     logger.info(f"Sample probabilities: {probabilities}")
-
 
 if __name__ == "__main__":
     setup_logging()
