@@ -103,16 +103,18 @@ def build_preprocessing_pipeline(
 
     return preprocessor
 
-
 def generate_risk_clusters(X_train, X_val, X_test, numeric_features, n_clusters=5):
-    """
-    Train a KMeans clustering model on numeric borrower features
-    and create a new feature called 'risk_cluster'.
-    """
 
     logger = logging.getLogger(__name__)
 
     logger.info("Training KMeans risk clustering model")
+
+    # impute missing values before clustering
+    imputer = SimpleImputer(strategy="median")
+
+    X_train_num = imputer.fit_transform(X_train[numeric_features])
+    X_val_num = imputer.transform(X_val[numeric_features])
+    X_test_num = imputer.transform(X_test[numeric_features])
 
     kmeans = KMeans(
         n_clusters=n_clusters,
@@ -120,8 +122,7 @@ def generate_risk_clusters(X_train, X_val, X_test, numeric_features, n_clusters=
         n_init=10
     )
 
-    # Fit clustering on training data only
-    kmeans.fit(X_train[numeric_features])
+    kmeans.fit(X_train_num)
 
     logger.info("Assigning risk clusters")
 
@@ -129,9 +130,9 @@ def generate_risk_clusters(X_train, X_val, X_test, numeric_features, n_clusters=
     X_val = X_val.copy()
     X_test = X_test.copy()
 
-    X_train["risk_cluster"] = kmeans.predict(X_train[numeric_features])
-    X_val["risk_cluster"] = kmeans.predict(X_val[numeric_features])
-    X_test["risk_cluster"] = kmeans.predict(X_test[numeric_features])
+    X_train["risk_cluster"] = kmeans.predict(X_train_num)
+    X_val["risk_cluster"] = kmeans.predict(X_val_num)
+    X_test["risk_cluster"] = kmeans.predict(X_test_num)
 
     logger.info("Risk clustering completed")
 
