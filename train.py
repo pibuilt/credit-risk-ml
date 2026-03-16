@@ -233,6 +233,56 @@ def plot_pr_curve(y_true, y_prob, logger):
 
     logger.info(f"PR curve saved to {path}")
 
+def objective(trial, X_train, y_train, preprocessor):
+
+    params = {
+        "n_estimators": trial.suggest_int("n_estimators", 200, 600),
+        "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.2),
+        "num_leaves": trial.suggest_int("num_leaves", 20, 200),
+        "max_depth": trial.suggest_int("max_depth", 3, 12),
+        "min_child_samples": trial.suggest_int("min_child_samples", 5, 100),
+        "reg_alpha": trial.suggest_float("reg_alpha", 0.0, 1.0),
+        "reg_lambda": trial.suggest_float("reg_lambda", 0.0, 1.0),
+        "class_weight": "balanced",
+        "n_jobs": -1,
+        "random_state": 42
+    }
+
+    model = LGBMClassifier(**params)
+
+    pipeline = Pipeline(
+        steps=[
+            ("preprocessing", preprocessor),
+            ("model", model)
+        ]
+    )
+
+    cv = StratifiedKFold(
+        n_splits=5,
+        shuffle=True,
+        random_state=42
+    )
+
+    scores = []
+
+    for train_idx, val_idx in cv.split(X_train, y_train):
+
+        X_tr = X_train.iloc[train_idx]
+        y_tr = y_train.iloc[train_idx]
+
+        X_val = X_train.iloc[val_idx]
+        y_val = y_train.iloc[val_idx]
+
+        pipeline.fit(X_tr, y_tr)
+
+        preds = pipeline.predict_proba(X_val)[:, 1]
+
+        score = roc_auc_score(y_val, preds)
+
+        scores.append(score)
+
+    return sum(scores) / len(scores)
+
 
 def main():
 
@@ -301,7 +351,8 @@ def main():
             n_estimators=300,
             learning_rate=0.05,
             num_leaves=31,
-            class_weight="balanced"
+            class_weight="balanced",
+            verbose=-1
         )
     }
 
@@ -361,7 +412,36 @@ def main():
     if best_model_name is None:
         raise RuntimeError("No model was selected during cross-validation")
 
-    best_model = models[best_model_name]
+
+    # ------------------------------------------------
+    # Hyperparameter tuning with Optuna (LightGBM only)
+    # ------------------------------------------------
+
+    if best_model_name == "lightgbm":
+
+        logger.info("Starting Optuna hyperparameter tuning for LightGBM")
+
+        study = optuna.create_study(direction="maximize")
+
+        study.optimize(
+            lambda trial: objective(trial, X_train, y_train, preprocessor),
+            n_trials=5
+        )
+
+        logger.info(f"Best Optuna score: {study.best_value:.4f}")
+        logger.info(f"Best parameters: {study.best_params}")
+
+        best_model = LGBMClassifier(
+            **study.best_params,
+            class_weight="balanced",
+            n_jobs=-1,
+            random_state=42,
+            verbose=-1
+        )
+
+    else:
+
+        best_model = models[best_model_name]
 
     logger.info("Training best model on full training data")
 
