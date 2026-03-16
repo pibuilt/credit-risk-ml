@@ -17,7 +17,7 @@ from sklearn.model_selection import train_test_split, StratifiedKFold
 from sklearn.metrics import roc_auc_score, average_precision_score, f1_score, confusion_matrix, roc_curve, precision_recall_curve, brier_score_loss
 from sklearn.ensemble import RandomForestClassifier
 from lightgbm import LGBMClassifier
-
+import optuna
 
 def setup_logging():
     logging.basicConfig(
