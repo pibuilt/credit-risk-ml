@@ -18,6 +18,8 @@ from sklearn.metrics import roc_auc_score, average_precision_score, f1_score, co
 from sklearn.ensemble import RandomForestClassifier
 from lightgbm import LGBMClassifier
 import optuna
+import shap
+import matplotlib.pyplot as plt
 
 def setup_logging():
     logging.basicConfig(
@@ -232,6 +234,49 @@ def plot_pr_curve(y_true, y_prob, logger):
     plt.close()
 
     logger.info(f"PR curve saved to {path}")
+
+def generate_shap_summary(pipeline, X_val, logger):
+
+    logger.info("Generating SHAP explanations")
+
+    if not os.path.exists("reports"):
+        os.makedirs("reports")
+
+    # Sample for performance
+    sample_size = min(500, len(X_val))
+    X_sample = X_val.sample(n=sample_size, random_state=42)
+
+    preprocessor = pipeline.named_steps["preprocessing"]
+    model = pipeline.named_steps["model"]
+
+    # Transform features
+    X_transformed = preprocessor.transform(X_sample)
+
+    # 🔥 FIX 1 — Convert sparse → dense
+    if hasattr(X_transformed, "toarray"):
+        X_transformed = X_transformed.toarray()
+
+    explainer = shap.TreeExplainer(model)
+
+    shap_values = explainer.shap_values(X_transformed)
+
+    # 🔥 FIX 2 — Handle LightGBM output format
+    if isinstance(shap_values, list):
+        shap_values = shap_values[1]
+
+    logger.info("Creating SHAP summary plot")
+
+    plt.figure()
+    shap.summary_plot(
+        shap_values,
+        X_transformed,
+        show=False
+    )
+
+    plt.savefig("reports/shap_summary.png", bbox_inches="tight")
+    plt.close()
+
+    logger.info("SHAP summary saved to reports/shap_summary.png")
 
 def objective(trial, X_train, y_train, preprocessor):
 
@@ -481,6 +526,8 @@ def main():
 
     logger.info(f"Sample predictions: {predictions}")
     logger.info(f"Sample probabilities: {probabilities}")
+
+    generate_shap_summary(final_pipeline, X_val, logger)
 
 
 if __name__ == "__main__":
