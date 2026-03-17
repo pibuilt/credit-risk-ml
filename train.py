@@ -349,6 +349,21 @@ def objective(trial, X_train, y_train, preprocessor):
 
     return sum(scores) / len(scores)
 
+def format_prediction(probability, risk_cluster=None):
+    """
+    Format prediction into API-ready structure
+    """
+
+    score = calculate_credit_score(probability)
+    risk_level = get_risk_level(score)
+
+    return {
+        "default_probability": float(probability),
+        "risk_score": score,
+        "risk_level": risk_level,
+        "risk_cluster": int(risk_cluster) if risk_cluster is not None else None
+    }
+
 
 def main():
 
@@ -540,21 +555,24 @@ def main():
     plot_roc_curve(y_val, val_probabilities, logger)
     plot_pr_curve(y_val, val_probabilities, logger)
 
-    logger.info("Generating sample predictions")
 
+    logger.info("Generating sample predictions")
     predictions = final_pipeline.predict(X_test[:5])
     probabilities = final_pipeline.predict_proba(X_test[:5])[:, 1]
 
+    logger.info("Generating structured predictions")
+    sample_data = X_test.iloc[:5]
+    risk_clusters = sample_data.get("risk_cluster", [None]*len(sample_data))
+    for i, prob in enumerate(probabilities):
+        result = format_prediction(prob, risk_clusters.iloc[i] if hasattr(risk_clusters, "iloc") else None)
+        logger.info(f"Prediction {i}: {result}")
     logger.info(f"Sample predictions: {predictions}")
     logger.info(f"Sample probabilities: {probabilities}")
 
     logger.info("Generating credit risk scores")
-
     for i, prob in enumerate(probabilities):
-
         score = calculate_credit_score(prob)
         risk = get_risk_level(score)
-
         logger.info(
             f"Sample {i} | Prob: {prob:.4f} | Score: {score} | Risk: {risk}"
         )
