@@ -18,6 +18,8 @@ from sklearn.metrics import roc_auc_score, average_precision_score, f1_score, co
 from sklearn.ensemble import RandomForestClassifier
 from lightgbm import LGBMClassifier
 import optuna
+import shap
+import matplotlib.pyplot as plt
 
 def setup_logging():
     logging.basicConfig(
@@ -233,6 +235,70 @@ def plot_pr_curve(y_true, y_prob, logger):
 
     logger.info(f"PR curve saved to {path}")
 
+def generate_shap_summary(pipeline, X_val, logger):
+
+    logger.info("Generating SHAP explanations")
+
+    if not os.path.exists("reports"):
+        os.makedirs("reports")
+
+    # Sample for performance
+    sample_size = min(500, len(X_val))
+    X_sample = X_val.sample(n=sample_size, random_state=42)
+
+    preprocessor = pipeline.named_steps["preprocessing"]
+    model = pipeline.named_steps["model"]
+
+    # Transform features
+    X_transformed = preprocessor.transform(X_sample)
+
+    # 🔥 FIX 1 — Convert sparse → dense
+    if hasattr(X_transformed, "toarray"):
+        X_transformed = X_transformed.toarray()
+
+    explainer = shap.TreeExplainer(model)
+
+    shap_values = explainer.shap_values(X_transformed)
+
+    # 🔥 FIX 2 — Handle LightGBM output format
+    if isinstance(shap_values, list):
+        shap_values = shap_values[1]
+
+    logger.info("Creating SHAP summary plot")
+
+    plt.figure()
+    shap.summary_plot(
+        shap_values,
+        X_transformed,
+        show=False
+    )
+
+    plt.savefig("reports/shap_summary.png", bbox_inches="tight")
+    plt.close()
+
+    logger.info("SHAP summary saved to reports/shap_summary.png")
+
+def calculate_credit_score(probability):
+    """
+    Convert probability to credit score (300–850 range approx)
+    """
+    score = 850 - (probability * 550)
+    return int(score)
+
+def get_risk_level(score):
+    """
+    Categorize credit score into risk buckets
+    """
+
+    if score >= 750:
+        return "Low Risk"
+    elif score >= 650:
+        return "Medium Risk"
+    elif score >= 550:
+        return "High Risk"
+    else:
+        return "Very High Risk"
+
 def objective(trial, X_train, y_train, preprocessor):
 
     params = {
@@ -282,6 +348,21 @@ def objective(trial, X_train, y_train, preprocessor):
         scores.append(score)
 
     return sum(scores) / len(scores)
+
+def format_prediction(probability, risk_cluster=None):
+    """
+    Format prediction into API-ready structure
+    """
+
+    score = calculate_credit_score(probability)
+    risk_level = get_risk_level(score)
+
+    return {
+        "default_probability": float(probability),
+        "risk_score": score,
+        "risk_level": risk_level,
+        "risk_cluster": int(risk_cluster) if risk_cluster is not None else None
+    }
 
 
 def main():
@@ -474,13 +555,29 @@ def main():
     plot_roc_curve(y_val, val_probabilities, logger)
     plot_pr_curve(y_val, val_probabilities, logger)
 
-    logger.info("Generating sample predictions")
 
+    logger.info("Generating sample predictions")
     predictions = final_pipeline.predict(X_test[:5])
     probabilities = final_pipeline.predict_proba(X_test[:5])[:, 1]
 
+    logger.info("Generating structured predictions")
+    sample_data = X_test.iloc[:5]
+    risk_clusters = sample_data.get("risk_cluster", [None]*len(sample_data))
+    for i, prob in enumerate(probabilities):
+        result = format_prediction(prob, risk_clusters.iloc[i] if hasattr(risk_clusters, "iloc") else None)
+        logger.info(f"Prediction {i}: {result}")
     logger.info(f"Sample predictions: {predictions}")
     logger.info(f"Sample probabilities: {probabilities}")
+
+    logger.info("Generating credit risk scores")
+    for i, prob in enumerate(probabilities):
+        score = calculate_credit_score(prob)
+        risk = get_risk_level(score)
+        logger.info(
+            f"Sample {i} | Prob: {prob:.4f} | Score: {score} | Risk: {risk}"
+        )
+
+    generate_shap_summary(final_pipeline, X_val, logger)
 
 
 if __name__ == "__main__":

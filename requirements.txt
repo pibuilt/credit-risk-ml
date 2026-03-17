@@ -4,3 +4,4 @@ scikit-learn
 matplotlib
 lightgbm
 optuna
+shap
