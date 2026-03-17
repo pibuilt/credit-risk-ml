@@ -278,6 +278,27 @@ def generate_shap_summary(pipeline, X_val, logger):
 
     logger.info("SHAP summary saved to reports/shap_summary.png")
 
+def calculate_credit_score(probability):
+    """
+    Convert probability to credit score (300–850 range approx)
+    """
+    score = 850 - (probability * 550)
+    return int(score)
+
+def get_risk_level(score):
+    """
+    Categorize credit score into risk buckets
+    """
+
+    if score >= 750:
+        return "Low Risk"
+    elif score >= 650:
+        return "Medium Risk"
+    elif score >= 550:
+        return "High Risk"
+    else:
+        return "Very High Risk"
+
 def objective(trial, X_train, y_train, preprocessor):
 
     params = {
@@ -526,6 +547,17 @@ def main():
 
     logger.info(f"Sample predictions: {predictions}")
     logger.info(f"Sample probabilities: {probabilities}")
+
+    logger.info("Generating credit risk scores")
+
+    for i, prob in enumerate(probabilities):
+
+        score = calculate_credit_score(prob)
+        risk = get_risk_level(score)
+
+        logger.info(
+            f"Sample {i} | Prob: {prob:.4f} | Score: {score} | Risk: {risk}"
+        )
 
     generate_shap_summary(final_pipeline, X_val, logger)
 
