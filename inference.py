@@ -100,6 +100,11 @@ class ModelService:
 
         return results
 
+
+# -----------------------------------
+# LOCAL TEST
+# -----------------------------------
+
 if __name__ == "__main__":
     setup_logging()
 

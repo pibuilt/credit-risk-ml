@@ -6,11 +6,6 @@ import joblib
 from datetime import datetime 
 
 from explore_data import prepare_target
-from features import (
-    get_feature_groups,
-    build_preprocessing_pipeline,
-    generate_risk_clusters
-)
 
 from sklearn.pipeline import Pipeline
 from sklearn.linear_model import LogisticRegression
@@ -21,6 +16,11 @@ from lightgbm import LGBMClassifier
 import optuna
 import shap
 import matplotlib.pyplot as plt
+
+from features import (
+    get_feature_groups,
+    build_preprocessing_pipeline
+)
 
 def setup_logging():
     logging.basicConfig(
@@ -396,21 +396,6 @@ def main():
         X_train, logger
     )
 
-    # generate risk clusters
-    logger.info("Generating risk clusters using KMeans")
-
-    X_train, X_val, X_test = generate_risk_clusters(
-        X_train,
-        X_val,
-        X_test,
-        numeric_features
-    )
-
-    # re-detect feature groups (now includes risk_cluster)
-    numeric_features, categorical_features, text_features = get_feature_groups(
-        X_train, logger
-    )
-
     # build preprocessing pipeline
     preprocessor = build_preprocessing_pipeline(
         numeric_features,
@@ -563,9 +548,8 @@ def main():
 
     logger.info("Generating structured predictions")
     sample_data = X_test.iloc[:5]
-    risk_clusters = sample_data.get("risk_cluster", [None]*len(sample_data))
     for i, prob in enumerate(probabilities):
-        result = format_prediction(prob, risk_clusters.iloc[i] if hasattr(risk_clusters, "iloc") else None)
+        result = format_prediction(prob, None)
         logger.info(f"Prediction {i}: {result}")
     logger.info(f"Sample predictions: {predictions}")
     logger.info(f"Sample probabilities: {probabilities}")
