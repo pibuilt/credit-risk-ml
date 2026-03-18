@@ -3,6 +3,7 @@ import pandas as pd
 import json
 import os
 import joblib
+from datetime import datetime 
 
 from explore_data import prepare_target
 from features import (
@@ -591,6 +592,25 @@ def main():
 
     logger.info(f"Model saved at {model_path}")
 
+    logger.info("Saving model metadata")
+
+    metadata = {
+        "model_version": model_version,
+        "training_date": datetime.utcnow().isoformat(),
+        "metrics": {
+            "roc_auc": metrics["roc_auc"],
+            "pr_auc": metrics["pr_auc"],
+            "f1_score": metrics["f1_score"],
+            "brier_score": metrics["brier_score"]
+        }
+    }
+
+    metadata_path = "models/metadata.json"
+
+    with open(metadata_path, "w") as f:
+        json.dump(metadata, f, indent=2)
+
+    logger.info(f"Model metadata saved at {metadata_path}")
 
 if __name__ == "__main__":
     setup_logging()
