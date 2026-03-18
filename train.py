@@ -2,7 +2,7 @@ import logging
 import pandas as pd
 import json
 import os
-import matplotlib.pyplot as plt
+import joblib
 
 from explore_data import prepare_target
 from features import (
@@ -578,6 +578,18 @@ def main():
         )
 
     generate_shap_summary(final_pipeline, X_val, logger)
+
+    logger.info("Saving trained model")
+
+    os.makedirs("models", exist_ok=True)
+
+    model_version = "v1"
+
+    model_path = f"models/credit_model_{model_version}.pkl"
+
+    joblib.dump(final_pipeline, model_path)
+
+    logger.info(f"Model saved at {model_path}")
 
 
 if __name__ == "__main__":
