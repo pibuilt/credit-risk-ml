@@ -2,14 +2,10 @@ import logging
 import pandas as pd
 import json
 import os
-import matplotlib.pyplot as plt
+import joblib
+from datetime import datetime 
 
 from explore_data import prepare_target
-from features import (
-    get_feature_groups,
-    build_preprocessing_pipeline,
-    generate_risk_clusters
-)
 
 from sklearn.pipeline import Pipeline
 from sklearn.linear_model import LogisticRegression
@@ -20,6 +16,11 @@ from lightgbm import LGBMClassifier
 import optuna
 import shap
 import matplotlib.pyplot as plt
+
+from features import (
+    get_feature_groups,
+    build_preprocessing_pipeline
+)
 
 def setup_logging():
     logging.basicConfig(
@@ -395,21 +396,6 @@ def main():
         X_train, logger
     )
 
-    # generate risk clusters
-    logger.info("Generating risk clusters using KMeans")
-
-    X_train, X_val, X_test = generate_risk_clusters(
-        X_train,
-        X_val,
-        X_test,
-        numeric_features
-    )
-
-    # re-detect feature groups (now includes risk_cluster)
-    numeric_features, categorical_features, text_features = get_feature_groups(
-        X_train, logger
-    )
-
     # build preprocessing pipeline
     preprocessor = build_preprocessing_pipeline(
         numeric_features,
@@ -562,9 +548,8 @@ def main():
 
     logger.info("Generating structured predictions")
     sample_data = X_test.iloc[:5]
-    risk_clusters = sample_data.get("risk_cluster", [None]*len(sample_data))
     for i, prob in enumerate(probabilities):
-        result = format_prediction(prob, risk_clusters.iloc[i] if hasattr(risk_clusters, "iloc") else None)
+        result = format_prediction(prob, None)
         logger.info(f"Prediction {i}: {result}")
     logger.info(f"Sample predictions: {predictions}")
     logger.info(f"Sample probabilities: {probabilities}")
@@ -579,6 +564,37 @@ def main():
 
     generate_shap_summary(final_pipeline, X_val, logger)
 
+    logger.info("Saving trained model")
+
+    os.makedirs("models", exist_ok=True)
+
+    model_version = "v1"
+
+    model_path = f"models/credit_model_{model_version}.pkl"
+
+    joblib.dump(final_pipeline, model_path)
+
+    logger.info(f"Model saved at {model_path}")
+
+    logger.info("Saving model metadata")
+
+    metadata = {
+        "model_version": model_version,
+        "training_date": datetime.utcnow().isoformat(),
+        "metrics": {
+            "roc_auc": metrics["roc_auc"],
+            "pr_auc": metrics["pr_auc"],
+            "f1_score": metrics["f1_score"],
+            "brier_score": metrics["brier_score"]
+        }
+    }
+
+    metadata_path = "models/metadata.json"
+
+    with open(metadata_path, "w") as f:
+        json.dump(metadata, f, indent=2)
+
+    logger.info(f"Model metadata saved at {metadata_path}")
 
 if __name__ == "__main__":
     setup_logging()

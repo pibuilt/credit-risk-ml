@@ -1,3 +1,4 @@
+
 import logging
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
@@ -6,7 +7,29 @@ from sklearn.impute import SimpleImputer
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.preprocessing import FunctionTransformer
 from sklearn.cluster import KMeans
+from sklearn.base import BaseEstimator, TransformerMixin
 
+# --- Fix for pickling error: define fillna_str as a top-level function ---
+def fillna_str(x):
+    return x.fillna("").astype(str)
+
+class RiskClusterTransformer(BaseEstimator, TransformerMixin):
+
+    def __init__(self, n_clusters=5):
+        self.n_clusters = n_clusters
+        self.imputer = SimpleImputer(strategy="median")
+        self.kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
+
+    def fit(self, X, y=None):
+        X_imputed = self.imputer.fit_transform(X)
+        self.kmeans.fit(X_imputed)
+        return self
+
+    def transform(self, X):
+        X_imputed = self.imputer.transform(X)
+        clusters = self.kmeans.predict(X_imputed)
+
+        return clusters.reshape(-1, 1)
 
 def get_feature_groups(df, logger):
 
@@ -33,11 +56,6 @@ def get_feature_groups(df, logger):
     # remove target if present
     if "default" in numeric_features:
         numeric_features.remove("default")
-
-    # ensure risk_cluster is treated as categorical
-    if "risk_cluster" in numeric_features:
-        numeric_features.remove("risk_cluster")
-        categorical_features.append("risk_cluster")
 
     logger.info(f"Numeric features: {len(numeric_features)}")
     logger.info(f"Categorical features: {len(categorical_features)}")
@@ -72,17 +90,19 @@ def build_preprocessing_pipeline(
     transformers = [
         ("num", numeric_pipeline, numeric_features),
         ("cat", categorical_pipeline, categorical_features),
+        ("risk_cluster", RiskClusterTransformer(), numeric_features),
     ]
 
     # add text pipelines
     for text_col in text_features:
+
 
         text_pipeline = Pipeline(
             steps=[
                 (
                     "fillna",
                     FunctionTransformer(
-                        lambda x: x.fillna("").astype(str),
+                        fillna_str,
                         validate=False
                     ),
                 ),
