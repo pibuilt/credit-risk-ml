@@ -1,3 +1,4 @@
+
 import logging
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
@@ -6,6 +7,10 @@ from sklearn.impute import SimpleImputer
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.preprocessing import FunctionTransformer
 from sklearn.cluster import KMeans
+
+# --- Fix for pickling error: define fillna_str as a top-level function ---
+def fillna_str(x):
+    return x.fillna("").astype(str)
 
 
 def get_feature_groups(df, logger):
@@ -77,12 +82,13 @@ def build_preprocessing_pipeline(
     # add text pipelines
     for text_col in text_features:
 
+
         text_pipeline = Pipeline(
             steps=[
                 (
                     "fillna",
                     FunctionTransformer(
-                        lambda x: x.fillna("").astype(str),
+                        fillna_str,
                         validate=False
                     ),
                 ),
