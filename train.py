@@ -22,6 +22,9 @@ from features import (
     build_preprocessing_pipeline
 )
 
+import mlflow
+import mlflow.sklearn
+
 def setup_logging():
     logging.basicConfig(
         level=logging.INFO,
@@ -370,231 +373,251 @@ def main():
 
     logger = logging.getLogger(__name__)
 
+    mlflow.set_experiment("credit-risk")
+
     df = load_dataset(logger)
 
-    df = prepare_target(df, logger)
+    with mlflow.start_run():
 
-    df = clean_dataset(df, logger)
+        df = prepare_target(df, logger)
 
-    X = df.drop(columns=["default", "loan_status"])
-    y = df["default"]
+        df = clean_dataset(df, logger)
 
-    logger.info(f"Sample feature columns: {list(X.columns)[:10]}")
+        X = df.drop(columns=["default", "loan_status"])
+        y = df["default"]
 
-    X_train, X_val, X_test, y_train, y_val, y_test = split_dataset(X, y, logger)
+        logger.info(f"Sample feature columns: {list(X.columns)[:10]}")
 
-    cv = StratifiedKFold(
-        n_splits=5,
-        shuffle=True,
-        random_state=42
-    )
+        X_train, X_val, X_test, y_train, y_val, y_test = split_dataset(X, y, logger)
 
-    logger.info(f"Feature matrix shape: {X.shape}")
-
-    # identify feature groups
-    numeric_features, categorical_features, text_features = get_feature_groups(
-        X_train, logger
-    )
-
-    # build preprocessing pipeline
-    preprocessor = build_preprocessing_pipeline(
-        numeric_features,
-        categorical_features,
-        text_features,
-        logger
-    )
-
-    models = {
-        "logistic_regression": LogisticRegression(
-            max_iter=1000,
-            class_weight="balanced"
-        ),
-        "random_forest": RandomForestClassifier(
-            n_estimators=200,
-            n_jobs=-1,
-            class_weight="balanced"
-        ),
-        "lightgbm": LGBMClassifier(
-            n_estimators=300,
-            learning_rate=0.05,
-            num_leaves=31,
-            class_weight="balanced",
-            verbose=-1
+        cv = StratifiedKFold(
+            n_splits=5,
+            shuffle=True,
+            random_state=42
         )
-    }
 
-    logger.info("Feature pipeline ready")
+        logger.info(f"Feature matrix shape: {X.shape}")
 
-    logger.info("Starting model comparison with cross-validation")
+        # identify feature groups
+        numeric_features, categorical_features, text_features = get_feature_groups(
+            X_train, logger
+        )
 
-    best_model_name = None
-    best_score = 0
+        # build preprocessing pipeline
+        preprocessor = build_preprocessing_pipeline(
+            numeric_features,
+            categorical_features,
+            text_features,
+            logger
+        )
 
-    for model_name, model in models.items():
+        models = {
+            "logistic_regression": LogisticRegression(
+                max_iter=1000,
+                class_weight="balanced"
+            ),
+            "random_forest": RandomForestClassifier(
+                n_estimators=200,
+                n_jobs=-1,
+                class_weight="balanced"
+            ),
+            "lightgbm": LGBMClassifier(
+                n_estimators=300,
+                learning_rate=0.05,
+                num_leaves=31,
+                class_weight="balanced",
+                verbose=-1
+            )
+        }
 
-        logger.info(f"Training model: {model_name}")
+        logger.info("Feature pipeline ready")
 
-        pipeline = Pipeline(
+        logger.info("Starting model comparison with cross-validation")
+
+        best_model_name = None
+        best_score = 0
+
+        for model_name, model in models.items():
+
+            logger.info(f"Training model: {model_name}")
+
+            pipeline = Pipeline(
+                steps=[
+                    ("preprocessing", preprocessor),
+                    ("model", model)
+                ]
+            )
+
+            roc_scores = []
+            pr_scores = []
+
+            for fold, (train_idx, val_idx) in enumerate(cv.split(X_train, y_train)):
+
+                logger.info(f"{model_name} | Fold {fold + 1}")
+
+                X_tr = X_train.iloc[train_idx]
+                y_tr = y_train.iloc[train_idx]
+
+                X_val_fold = X_train.iloc[val_idx]
+                y_val_fold = y_train.iloc[val_idx]
+
+                pipeline.fit(X_tr, y_tr)
+
+                preds = pipeline.predict_proba(X_val_fold)[:, 1]
+
+                roc = roc_auc_score(y_val_fold, preds)
+                pr = average_precision_score(y_val_fold, preds)
+
+                roc_scores.append(roc)
+                pr_scores.append(pr)
+
+            mean_roc = sum(roc_scores) / len(roc_scores)
+            mean_pr = sum(pr_scores) / len(pr_scores)
+
+            logger.info(f"{model_name} | Mean ROC-AUC: {mean_roc:.4f}")
+            logger.info(f"{model_name} | Mean PR-AUC: {mean_pr:.4f}")
+
+            if mean_pr > best_score:
+                best_score = mean_pr
+                best_model_name = model_name
+
+        logger.info(f"Best model selected: {best_model_name}")
+        mlflow.log_param("best_model", best_model_name)
+
+        if best_model_name is None:
+            raise RuntimeError("No model was selected during cross-validation")
+
+
+        # ------------------------------------------------
+        # Hyperparameter tuning with Optuna (LightGBM only)
+        # ------------------------------------------------
+
+        if best_model_name == "lightgbm":
+
+            logger.info("Starting Optuna hyperparameter tuning for LightGBM")
+
+            study = optuna.create_study(direction="maximize")
+
+            study.optimize(
+                lambda trial: objective(trial, X_train, y_train, preprocessor),
+                n_trials=5
+            )
+
+            logger.info(f"Best Optuna score: {study.best_value:.4f}")
+            logger.info(f"Best parameters: {study.best_params}")
+
+            mlflow.log_params(study.best_params)
+
+            best_model = LGBMClassifier(
+                **study.best_params,
+                class_weight="balanced",
+                n_jobs=-1,
+                random_state=42,
+                verbose=-1
+            )
+
+        else:
+
+            best_model = models[best_model_name]
+
+        logger.info("Training best model on full training data")
+
+        final_pipeline = Pipeline(
             steps=[
                 ("preprocessing", preprocessor),
-                ("model", model)
+                ("model", best_model)
             ]
         )
 
-        roc_scores = []
-        pr_scores = []
+        final_pipeline.fit(X_train, y_train)
 
-        for fold, (train_idx, val_idx) in enumerate(cv.split(X_train, y_train)):
+        logger.info("Model training complete")
 
-            logger.info(f"{model_name} | Fold {fold + 1}")
+        logger.info("Running validation evaluation")
 
-            X_tr = X_train.iloc[train_idx]
-            y_tr = y_train.iloc[train_idx]
+        val_predictions = final_pipeline.predict(X_val)
+        val_probabilities = final_pipeline.predict_proba(X_val)[:, 1]
 
-            X_val_fold = X_train.iloc[val_idx]
-            y_val_fold = y_train.iloc[val_idx]
-
-            pipeline.fit(X_tr, y_tr)
-
-            preds = pipeline.predict_proba(X_val_fold)[:, 1]
-
-            roc = roc_auc_score(y_val_fold, preds)
-            pr = average_precision_score(y_val_fold, preds)
-
-            roc_scores.append(roc)
-            pr_scores.append(pr)
-
-        mean_roc = sum(roc_scores) / len(roc_scores)
-        mean_pr = sum(pr_scores) / len(pr_scores)
-
-        logger.info(f"{model_name} | Mean ROC-AUC: {mean_roc:.4f}")
-        logger.info(f"{model_name} | Mean PR-AUC: {mean_pr:.4f}")
-
-        if mean_pr > best_score:
-            best_score = mean_pr
-            best_model_name = model_name
-
-    logger.info(f"Best model selected: {best_model_name}")
-
-    if best_model_name is None:
-        raise RuntimeError("No model was selected during cross-validation")
-
-
-    # ------------------------------------------------
-    # Hyperparameter tuning with Optuna (LightGBM only)
-    # ------------------------------------------------
-
-    if best_model_name == "lightgbm":
-
-        logger.info("Starting Optuna hyperparameter tuning for LightGBM")
-
-        study = optuna.create_study(direction="maximize")
-
-        study.optimize(
-            lambda trial: objective(trial, X_train, y_train, preprocessor),
-            n_trials=5
+        metrics = evaluate_model(
+            y_val,
+            val_predictions,
+            val_probabilities,
+            logger
         )
 
-        logger.info(f"Best Optuna score: {study.best_value:.4f}")
-        logger.info(f"Best parameters: {study.best_params}")
-
-        best_model = LGBMClassifier(
-            **study.best_params,
-            class_weight="balanced",
-            n_jobs=-1,
-            random_state=42,
-            verbose=-1
-        )
-
-    else:
-
-        best_model = models[best_model_name]
-
-    logger.info("Training best model on full training data")
-
-    final_pipeline = Pipeline(
-        steps=[
-            ("preprocessing", preprocessor),
-            ("model", best_model)
-        ]
-    )
-
-    final_pipeline.fit(X_train, y_train)
-
-    logger.info("Model training complete")
-
-    logger.info("Running validation evaluation")
-
-    val_predictions = final_pipeline.predict(X_val)
-    val_probabilities = final_pipeline.predict_proba(X_val)[:, 1]
-
-    metrics = evaluate_model(
-        y_val,
-        val_predictions,
-        val_probabilities,
-        logger
-    )
-
-    save_metrics(metrics, logger)
-
-    plot_confusion_matrix(metrics["confusion_matrix"], logger)
-    plot_roc_curve(y_val, val_probabilities, logger)
-    plot_pr_curve(y_val, val_probabilities, logger)
-
-
-    logger.info("Generating sample predictions")
-    predictions = final_pipeline.predict(X_test[:5])
-    probabilities = final_pipeline.predict_proba(X_test[:5])[:, 1]
-
-    logger.info("Generating structured predictions")
-    sample_data = X_test.iloc[:5]
-    for i, prob in enumerate(probabilities):
-        result = format_prediction(prob, None)
-        logger.info(f"Prediction {i}: {result}")
-    logger.info(f"Sample predictions: {predictions}")
-    logger.info(f"Sample probabilities: {probabilities}")
-
-    logger.info("Generating credit risk scores")
-    for i, prob in enumerate(probabilities):
-        score = calculate_credit_score(prob)
-        risk = get_risk_level(score)
-        logger.info(
-            f"Sample {i} | Prob: {prob:.4f} | Score: {score} | Risk: {risk}"
-        )
-
-    generate_shap_summary(final_pipeline, X_val, logger)
-
-    logger.info("Saving trained model")
-
-    os.makedirs("models", exist_ok=True)
-
-    model_version = "v1"
-
-    model_path = f"models/credit_model_{model_version}.pkl"
-
-    joblib.dump(final_pipeline, model_path)
-
-    logger.info(f"Model saved at {model_path}")
-
-    logger.info("Saving model metadata")
-
-    metadata = {
-        "model_version": model_version,
-        "training_date": datetime.utcnow().isoformat(),
-        "metrics": {
+        mlflow.log_metrics({
             "roc_auc": metrics["roc_auc"],
             "pr_auc": metrics["pr_auc"],
             "f1_score": metrics["f1_score"],
             "brier_score": metrics["brier_score"]
+        })
+
+        save_metrics(metrics, logger)
+
+        plot_confusion_matrix(metrics["confusion_matrix"], logger)
+        plot_roc_curve(y_val, val_probabilities, logger)
+        plot_pr_curve(y_val, val_probabilities, logger)
+
+
+        logger.info("Generating sample predictions")
+        predictions = final_pipeline.predict(X_test[:5])
+        probabilities = final_pipeline.predict_proba(X_test[:5])[:, 1]
+
+        logger.info("Generating structured predictions")
+        sample_data = X_test.iloc[:5]
+        for i, prob in enumerate(probabilities):
+            result = format_prediction(prob, None)
+            logger.info(f"Prediction {i}: {result}")
+        logger.info(f"Sample predictions: {predictions}")
+        logger.info(f"Sample probabilities: {probabilities}")
+
+        logger.info("Generating credit risk scores")
+        for i, prob in enumerate(probabilities):
+            score = calculate_credit_score(prob)
+            risk = get_risk_level(score)
+            logger.info(
+                f"Sample {i} | Prob: {prob:.4f} | Score: {score} | Risk: {risk}"
+            )
+
+        generate_shap_summary(final_pipeline, X_val, logger)
+
+        mlflow.log_artifact("reports/confusion_matrix.png")
+        mlflow.log_artifact("reports/roc_curve.png")
+        mlflow.log_artifact("reports/pr_curve.png")
+        mlflow.log_artifact("reports/shap_summary.png")
+        mlflow.log_artifact("reports/metrics.json")
+
+        logger.info("Saving trained model")
+
+        os.makedirs("models", exist_ok=True)
+
+        model_version = "v1"
+
+        model_path = f"models/credit_model_{model_version}.pkl"
+
+        joblib.dump(final_pipeline, model_path)
+
+        logger.info(f"Model saved at {model_path}")
+
+        logger.info("Saving model metadata")
+
+        metadata = {
+            "model_version": model_version,
+            "training_date": datetime.utcnow().isoformat(),
+            "metrics": {
+                "roc_auc": metrics["roc_auc"],
+                "pr_auc": metrics["pr_auc"],
+                "f1_score": metrics["f1_score"],
+                "brier_score": metrics["brier_score"]
+            }
         }
-    }
 
-    metadata_path = "models/metadata.json"
+        metadata_path = "models/metadata.json"
 
-    with open(metadata_path, "w") as f:
-        json.dump(metadata, f, indent=2)
+        with open(metadata_path, "w") as f:
+            json.dump(metadata, f, indent=2)
 
-    logger.info(f"Model metadata saved at {metadata_path}")
+        logger.info(f"Model metadata saved at {metadata_path}")
 
 if __name__ == "__main__":
     setup_logging()
