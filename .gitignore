@@ -5,14 +5,18 @@ __pycache__/
 # Virtual environment
 venv/
 
-# Dataset files
+# Dataset (DVC managed)
 data/*
-!data/.gitkeep
 !data/*.dvc
+!data/.gitkeep
 
+# Models (DVC managed)
+models/*
+!models/*.dvc
+
+# Reports
 reports/
 
+# MLflow
 mlruns/
 mlflow.db
-models/
-!models/*.dvc
