@@ -17,15 +17,15 @@ stages:
       size: 4549
     - path: train.py
       hash: md5
-      md5: b17447d5a4de129a1836061031488265
-      size: 16887
+      md5: 48c27d89f577ae52b5b1098125f1e396
+      size: 16883
     outs:
     - path: models/credit_model_v1.pkl
       hash: md5
-      md5: 89dc4a85beeddede17bdcbddc6bc63e4
-      size: 7925423
+      md5: dc8dde2003e075ce7876d207691b17a4
+      size: 6752447
     - path: reports
       hash: md5
-      md5: 0d92850325e00c95d2372d9721e88109.dir
-      size: 160301
+      md5: 44a7f8183ecd12df9830b560e1b9a115.dir
+      size: 158346
       nfiles: 5

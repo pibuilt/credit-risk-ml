@@ -250,7 +250,7 @@ def generate_shap_summary(pipeline, X_val, logger):
     sample_size = min(500, len(X_val))
     X_sample = X_val.sample(n=sample_size, random_state=42)
 
-    preprocessor = pipeline.named_steps["preprocessing"]
+    preprocessor = pipeline.named_steps["preprocessor"]
     model = pipeline.named_steps["model"]
 
     # Transform features
@@ -322,7 +322,7 @@ def objective(trial, X_train, y_train, preprocessor):
 
     pipeline = Pipeline(
         steps=[
-            ("preprocessing", preprocessor),
+            ("preprocessor", preprocessor),
             ("model", model)
         ]
     )
@@ -443,7 +443,7 @@ def main():
 
             pipeline = Pipeline(
                 steps=[
-                    ("preprocessing", preprocessor),
+                    ("preprocessor", preprocessor),
                     ("model", model)
                 ]
             )
@@ -524,7 +524,7 @@ def main():
 
         final_pipeline = Pipeline(
             steps=[
-                ("preprocessing", preprocessor),
+                ("preprocessor", preprocessor),
                 ("model", best_model)
             ]
         )

@@ -8,3 +8,5 @@ shap
 joblib
 mlflow
 dvc
+fastapi
+uvicorn
