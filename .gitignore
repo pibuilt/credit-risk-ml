@@ -8,7 +8,10 @@ venv/
 # Dataset files
 data/*
 !data/.gitkeep
+!data/*.dvc
 
 reports/
 
 mlruns/
+mlflow.db
+models/
