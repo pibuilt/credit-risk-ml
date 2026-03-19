@@ -41,10 +41,15 @@ async def log_requests(request: Request, call_next):
     try:
         response = await call_next(request)
     except Exception as e:
+        app.state.metrics["error_count"] += 1  # ✅ track errors
         logger.error(f"request_id={request_id} unhandled_error={str(e)}")
         raise
 
     latency = time.time() - start_time
+
+    # ✅ update metrics
+    app.state.metrics["request_count"] += 1
+    app.state.metrics["total_latency"] += latency
 
     logger.info(
         f"request_id={request_id} "
@@ -58,7 +63,7 @@ async def log_requests(request: Request, call_next):
 
 
 # -----------------------------------
-# STARTUP (SAFE MODEL LOADING)
+# STARTUP (SAFE MODEL LOADING + METRICS)
 # -----------------------------------
 
 @app.on_event("startup")
@@ -66,16 +71,21 @@ def startup_event():
     logger.info("Starting FastAPI application")
 
     model_service = ModelService("models/credit_model_v1.pkl")
-
     app.state.model_service = model_service
 
-    # Extract model + preprocessor
     pipeline = model_service.pipeline
     model = pipeline.named_steps["model"]
 
     app.state.explainer = shap.TreeExplainer(model)
 
-    logger.info("Model and SHAP explainer loaded successfully")
+    # ✅ METRICS INIT
+    app.state.metrics = {
+        "request_count": 0,
+        "error_count": 0,
+        "total_latency": 0.0
+    }
+
+    logger.info("Model, SHAP explainer, and metrics initialized successfully")
 
 
 # -----------------------------------
@@ -87,7 +97,7 @@ class PredictionRequest(BaseModel):
 
 
 # -----------------------------------
-# INPUT ADAPTER (CRITICAL FIX)
+# INPUT ADAPTER
 # -----------------------------------
 
 def build_full_dataframe(input_data, model_service):
@@ -97,57 +107,43 @@ def build_full_dataframe(input_data, model_service):
 
     missing_cols = []
 
-    # Add missing columns
     for col in expected_cols:
         if col not in df.columns:
             df[col] = None
             missing_cols.append(col)
 
-    # Log missing columns (observability)
     if missing_cols:
         logger.warning(
-            f"Missing columns auto-filled (showing first 10): {missing_cols[:10]}"
+            f"Missing columns auto-filled (first 10): {missing_cols[:10]}"
         )
 
-    # Reorder columns to match training schema
     df = df[expected_cols]
 
     return df
 
 
 # -----------------------------------
-# HEALTH ENDPOINT
+# SHAP EXPLAINABILITY
 # -----------------------------------
-
-@app.get("/health")
-def health_check():
-    return {"status": "ok"}
 
 def get_top_features(df, model_service, explainer, top_n=5):
 
     pipeline = model_service.pipeline
 
-    # Transform data
     X_transformed = pipeline.named_steps["preprocessor"].transform(df)
 
-    # Convert sparse → dense if needed
     if hasattr(X_transformed, "toarray"):
         X_transformed = X_transformed.toarray()
 
-    # SHAP values
     shap_values = explainer.shap_values(X_transformed)
 
-    # Binary classification fix
     if isinstance(shap_values, list):
         shap_values = shap_values[1]
 
-    # Take first row (single prediction)
     values = shap_values[0]
 
-    # Feature names (fallback if not available)
     feature_names = [f"feature_{i}" for i in range(len(values))]
 
-    # Top features
     top_idx = sorted(
         range(len(values)),
         key=lambda i: abs(values[i]),
@@ -162,6 +158,40 @@ def get_top_features(df, model_service, explainer, top_n=5):
         for i in top_idx
     ]
 
+
+# -----------------------------------
+# HEALTH ENDPOINT
+# -----------------------------------
+
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}
+
+
+# -----------------------------------
+# METRICS ENDPOINT
+# -----------------------------------
+
+@app.get("/metrics")
+def get_metrics():
+    metrics = app.state.metrics
+
+    request_count = metrics["request_count"]
+    error_count = metrics["error_count"]
+    total_latency = metrics["total_latency"]
+
+    avg_latency = (
+        total_latency / request_count
+        if request_count > 0 else 0
+    )
+
+    return {
+        "request_count": request_count,
+        "error_count": error_count,
+        "avg_latency": round(avg_latency, 4)
+    }
+
+
 # -----------------------------------
 # PREDICTION ENDPOINT
 # -----------------------------------
@@ -173,27 +203,33 @@ def predict(request: PredictionRequest, req: Request):
 
     try:
         model_service = app.state.model_service
+        explainer = app.state.explainer
 
-        #FIX: Use schema adapter instead of raw DataFrame
         df = build_full_dataframe(request.data, model_service)
 
         if df.empty:
             raise HTTPException(status_code=400, detail="Empty input data")
 
-        # Run inference
         results = model_service.predict_with_risk(df)
 
+        # SHAP
+        top_factors = get_top_features(df, model_service, explainer)
+
+        # logging prediction
         logger.info(
             f"request_id={request_id} "
-            f"inference_success rows={len(df)}"
+            f"prediction={results[0]['default_probability']:.4f} "
+            f"risk={results[0]['risk_level']}"
         )
 
         return {
             "request_id": request_id,
-            "predictions": results
+            "predictions": results,
+            "top_factors": top_factors
         }
 
     except ValueError as e:
+        app.state.metrics["error_count"] += 1  # ✅ track errors
         logger.error(
             f"request_id={request_id} validation_error={str(e)}"
         )
@@ -203,6 +239,7 @@ def predict(request: PredictionRequest, req: Request):
         raise
 
     except Exception as e:
+        app.state.metrics["error_count"] += 1  # ✅ track errors
         logger.error(
             f"request_id={request_id} inference_error={str(e)}"
         )
