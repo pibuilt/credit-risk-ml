@@ -5,6 +5,7 @@ import uuid
 from fastapi import FastAPI, Request, HTTPException
 from pydantic import BaseModel
 import pandas as pd
+import shap
 
 from inference import ModelService
 
@@ -64,9 +65,17 @@ async def log_requests(request: Request, call_next):
 def startup_event():
     logger.info("Starting FastAPI application")
 
-    app.state.model_service = ModelService("models/credit_model_v1.pkl")
+    model_service = ModelService("models/credit_model_v1.pkl")
 
-    logger.info("Model loaded successfully")
+    app.state.model_service = model_service
+
+    # Extract model + preprocessor
+    pipeline = model_service.pipeline
+    model = pipeline.named_steps["model"]
+
+    app.state.explainer = shap.TreeExplainer(model)
+
+    logger.info("Model and SHAP explainer loaded successfully")
 
 
 # -----------------------------------
@@ -114,6 +123,44 @@ def build_full_dataframe(input_data, model_service):
 def health_check():
     return {"status": "ok"}
 
+def get_top_features(df, model_service, explainer, top_n=5):
+
+    pipeline = model_service.pipeline
+
+    # Transform data
+    X_transformed = pipeline.named_steps["preprocessor"].transform(df)
+
+    # Convert sparse → dense if needed
+    if hasattr(X_transformed, "toarray"):
+        X_transformed = X_transformed.toarray()
+
+    # SHAP values
+    shap_values = explainer.shap_values(X_transformed)
+
+    # Binary classification fix
+    if isinstance(shap_values, list):
+        shap_values = shap_values[1]
+
+    # Take first row (single prediction)
+    values = shap_values[0]
+
+    # Feature names (fallback if not available)
+    feature_names = [f"feature_{i}" for i in range(len(values))]
+
+    # Top features
+    top_idx = sorted(
+        range(len(values)),
+        key=lambda i: abs(values[i]),
+        reverse=True
+    )[:top_n]
+
+    return [
+        {
+            "feature": feature_names[i],
+            "impact": float(values[i])
+        }
+        for i in top_idx
+    ]
 
 # -----------------------------------
 # PREDICTION ENDPOINT
