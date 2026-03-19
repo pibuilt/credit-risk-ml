@@ -10,3 +10,5 @@ data/*
 !data/.gitkeep
 
 reports/
+
+mlruns/
