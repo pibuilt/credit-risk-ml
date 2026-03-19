@@ -4,6 +4,8 @@ import uuid
 
 from fastapi import FastAPI, Request
 
+from inference import ModelService
+
 app = FastAPI()
 
 
@@ -37,6 +39,14 @@ async def log_requests(request: Request, call_next):
     )
 
     return response
+
+@app.on_event("startup")
+def startup_event():
+    logger.info("Starting FastAPI application")
+
+    app.state.model_service = ModelService("models/credit_model_v1.pkl")
+
+    logger.info("Model loaded successfully")
 
 
 @app.get("/health")
