@@ -20,3 +20,5 @@ reports/
 # MLflow
 mlruns/
 mlflow.db
+/credit_model_v1.pkl
+/reports
