@@ -1,0 +1,11 @@
+stages:
+  train:
+    cmd: python train.py
+    deps:
+      - explore_data.py
+      - features.py
+      - data/loan_2019_20.csv
+      - train.py
+    outs:
+      - models/credit_model_v1.pkl
+      - reports

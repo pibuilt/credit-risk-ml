@@ -1,0 +1,31 @@
+schema: '2.0'
+stages:
+  train:
+    cmd: python train.py
+    deps:
+    - path: data/loan_2019_20.csv
+      hash: md5
+      md5: a9219494c44675b2ca668cb902debb6e
+      size: 509477644
+    - path: explore_data.py
+      hash: md5
+      md5: a8ec0ce98f7a8ba5e14f1ca609e9d6f3
+      size: 3490
+    - path: features.py
+      hash: md5
+      md5: 9dffa278447bfcf33b2372a5a87a9e7f
+      size: 4549
+    - path: train.py
+      hash: md5
+      md5: b17447d5a4de129a1836061031488265
+      size: 16887
+    outs:
+    - path: models/credit_model_v1.pkl
+      hash: md5
+      md5: 89dc4a85beeddede17bdcbddc6bc63e4
+      size: 7925423
+    - path: reports
+      hash: md5
+      md5: 0d92850325e00c95d2372d9721e88109.dir
+      size: 160301
+      nfiles: 5
