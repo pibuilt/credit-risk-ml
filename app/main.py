@@ -4,7 +4,7 @@ import uuid
 
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from app.schemas.prediction import PredictionRequest
 import pandas as pd
 import shap
 
@@ -94,15 +94,6 @@ def startup_event():
     }
 
     logger.info("Model, SHAP explainer, and metrics initialized successfully")
-
-
-# -----------------------------------
-# REQUEST SCHEMA
-# -----------------------------------
-
-class PredictionRequest(BaseModel):
-    data: list[dict]
-
 
 # -----------------------------------
 # INPUT ADAPTER
@@ -213,7 +204,10 @@ def predict(request: PredictionRequest, req: Request):
         model_service = app.state.model_service
         explainer = app.state.explainer
 
-        df = build_full_dataframe(request.data, model_service)
+        df = build_full_dataframe(
+            [item.model_dump() for item in request.data],
+            model_service
+        )
 
         if df.empty:
             raise HTTPException(status_code=400, detail="Empty input data")
