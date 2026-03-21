@@ -4,11 +4,15 @@ import uuid
 
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from app.schemas.prediction import PredictionRequest
+from backend.app.schemas.prediction import PredictionRequest
 import pandas as pd
 import shap
 
-from app.services.model_service import ModelService
+
+from backend.app.services.model_service import ModelService
+from threading import Lock
+
+_model_lock = Lock()
 
 app = FastAPI()
 app.add_middleware(
@@ -74,26 +78,33 @@ async def log_requests(request: Request, call_next):
 # STARTUP (SAFE MODEL LOADING + METRICS)
 # -----------------------------------
 
+
+# Lazy loading for model and explainer
+def get_model_service():
+    with _model_lock:
+        if not hasattr(app.state, "model_service"):
+            logger.info("Loading model_service...")
+            app.state.model_service = ModelService("models/credit_model_v1.pkl")
+    return app.state.model_service
+
+def get_explainer(model_service):
+    with _model_lock:
+        if not hasattr(app.state, "explainer"):
+            logger.info("Loading SHAP explainer...")
+            model = model_service.pipeline.named_steps["model"]
+            app.state.explainer = shap.TreeExplainer(model)
+    return app.state.explainer
+
+# Metrics always initialized at startup
 @app.on_event("startup")
 def startup_event():
     logger.info("Starting FastAPI application")
-
-    model_service = ModelService("models/credit_model_v1.pkl")
-    app.state.model_service = model_service
-
-    pipeline = model_service.pipeline
-    model = pipeline.named_steps["model"]
-
-    app.state.explainer = shap.TreeExplainer(model)
-
-    # ✅ METRICS INIT
     app.state.metrics = {
         "request_count": 0,
         "error_count": 0,
         "total_latency": 0.0
     }
-
-    logger.info("Model, SHAP explainer, and metrics initialized successfully")
+    logger.info("Metrics initialized successfully")
 
 # -----------------------------------
 # INPUT ADAPTER
@@ -200,9 +211,10 @@ def predict(request: PredictionRequest, req: Request):
 
     request_id = req.state.request_id
 
+
     try:
-        model_service = app.state.model_service
-        explainer = app.state.explainer
+        model_service = get_model_service()
+        explainer = get_explainer(model_service)
 
         df = build_full_dataframe(
             [item.model_dump() for item in request.data],

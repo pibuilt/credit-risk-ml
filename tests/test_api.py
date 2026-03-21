@@ -1,5 +1,5 @@
 from fastapi.testclient import TestClient
-from app.main import app
+from backend.app.main import app
 
 def get_client():
     return TestClient(app)
@@ -17,9 +17,27 @@ def test_predict_valid():
         "data": [
             {
                 "loan_amnt": 10000,
+                "term": "36 months",
+                "emp_length": "10+ years",
+                "home_ownership": "RENT",
                 "annual_inc": 60000,
-                "dti": 15,
-                "fico_range_low": 680
+                "verification_status": "Verified",
+                "purpose": "debt_consolidation",
+                "dti": 15.0,
+                "delinq_2yrs": 0,
+                "fico_range_low": 680,
+                "fico_range_high": 684,
+                "open_acc": 10,
+                "pub_rec": 0,
+                "revol_bal": 12000.0,
+                "revol_util": 55.5,
+                "total_acc": 25,
+                "initial_list_status": "w",
+                "application_type": "INDIVIDUAL",
+                "mort_acc": 1,
+                "pub_rec_bankruptcies": 0,
+                "emp_title": "Engineer",
+                "title": "Debt consolidation",
             }
         ]
     }
