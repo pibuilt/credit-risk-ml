@@ -10,6 +10,25 @@ venv/
 mlruns/
 reports/
 
+# Notebooks, data, and misc
+data/
+notebooks/
+*.ipynb
+*.csv
+*.xlsx
+*.log
+*.tmp
+
+# Test files
+tests/
+*.test.*
+*.spec.*
+
+# Build and dist
+dist/
+build/
+*.egg-info/
+
 # Git
 .git
 
