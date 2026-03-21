@@ -2,7 +2,7 @@ import logging
 import joblib
 import pandas as pd
 
-from explore_data import prepare_target
+from ml.data import prepare_target
 
 
 def setup_logging():

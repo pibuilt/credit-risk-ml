@@ -5,7 +5,7 @@ import os
 import joblib
 from datetime import datetime 
 
-from explore_data import prepare_target
+from ml.data import prepare_target
 
 from sklearn.pipeline import Pipeline
 from sklearn.linear_model import LogisticRegression
@@ -17,7 +17,7 @@ import optuna
 import shap
 import matplotlib.pyplot as plt
 
-from features import (
+from ml.features import (
     get_feature_groups,
     build_preprocessing_pipeline
 )

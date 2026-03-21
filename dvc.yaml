@@ -1,11 +1,11 @@
 stages:
   train:
-    cmd: python train.py
+    cmd: python -m ml.train
     deps:
-      - explore_data.py
-      - features.py
+      - ml/data.py
+      - ml/features.py
       - data/loan_2019_20.csv
-      - train.py
+      - ml/train.py
     outs:
       - models/credit_model_v1.pkl
       - reports

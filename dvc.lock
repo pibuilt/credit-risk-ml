@@ -1,31 +1,31 @@
 schema: '2.0'
 stages:
   train:
-    cmd: python train.py
+    cmd: python -m ml.train
     deps:
     - path: data/loan_2019_20.csv
       hash: md5
       md5: a9219494c44675b2ca668cb902debb6e
       size: 509477644
-    - path: explore_data.py
+    - path: ml/data.py
       hash: md5
       md5: a8ec0ce98f7a8ba5e14f1ca609e9d6f3
       size: 3490
-    - path: features.py
+    - path: ml/features.py
       hash: md5
       md5: 9dffa278447bfcf33b2372a5a87a9e7f
       size: 4549
-    - path: train.py
+    - path: ml/train.py
       hash: md5
-      md5: 48c27d89f577ae52b5b1098125f1e396
-      size: 16883
+      md5: a13f6ad91a7fbd5606f134f5c5e2f035
+      size: 16881
     outs:
     - path: models/credit_model_v1.pkl
       hash: md5
-      md5: dc8dde2003e075ce7876d207691b17a4
-      size: 6752447
+      md5: 50ec2f715a65f7d3c2801c1883a2eee5
+      size: 5478623
     - path: reports
       hash: md5
-      md5: 44a7f8183ecd12df9830b560e1b9a115.dir
-      size: 158346
+      md5: de02bdbf2fa5bac0f56b5bf6e5123850.dir
+      size: 162727
       nfiles: 5
