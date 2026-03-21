@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Virtual env
+venv/
+
+# ML artifacts (NOT needed in container)
+mlruns/
+reports/
+
+# Git
+.git
+
+# DVC cache (VERY IMPORTANT)
+.dvc/cache
+
+# OS
+.DS_Store
+Thumbs.db
