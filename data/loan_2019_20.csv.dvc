@@ -1,0 +1,5 @@
+outs:
+- md5: a9219494c44675b2ca668cb902debb6e
+  size: 509477644
+  hash: md5
+  path: loan_2019_20.csv
