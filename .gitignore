@@ -6,11 +6,13 @@ __pycache__/
 # Virtual environment
 venv/
 
-# Dataset (DVC managed)
-data/*
+# Data (DVC managed)
+data/*.csv
+data/*.xlsx
+data/*.parquet
+data/*.zip
 !data/*.dvc
 !data/.gitkeep
-
 # Models (DVC managed)
 models/*
 !models/*.dvc
@@ -21,5 +23,7 @@ reports/
 # MLflow
 mlruns/
 mlflow.db
-/credit_model_v1.pkl
-/reports
+
+# OS
+.DS_Store
+Thumbs.db
