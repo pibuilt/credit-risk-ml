@@ -1,16 +1,46 @@
+# -----------------------------
+# STAGE 1 — BUILD
+# -----------------------------
+FROM python:3.11-slim AS builder
+
+WORKDIR /app
+
+# install build deps
+RUN apt-get update && apt-get install -y \
+    gcc \
+    libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# copy requirements
+COPY backend/requirements.txt .
+
+# install deps into custom dir
+RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+
+
+# -----------------------------
+# STAGE 2 — RUNTIME
+# -----------------------------
 FROM python:3.11-slim
 
 WORKDIR /app
 
-COPY backend/requirements.txt .
+# install ONLY runtime dependency
+RUN apt-get update && apt-get install -y \
+    libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install system dependencies for LightGBM/scikit-learn
-RUN apt-get update && apt-get install -y gcc libgomp1 && rm -rf /var/lib/apt/lists/*
+# copy installed python packages
+COPY --from=builder /install /usr/local
 
-RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+# copy only backend app and models (not data, .git, etc.)
+COPY backend/ ./backend/
+COPY models/ ./models/
+COPY ml/ ./ml/
 
+# expose port
 EXPOSE 8000
 
+# run app
 CMD ["uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
