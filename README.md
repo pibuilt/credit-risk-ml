@@ -2,7 +2,7 @@
 
 https://www.kaggle.com/datasets/beatafaron/loan-credit-risk-and-population-stability
 
-Production-grade machine learning platform for predicting loan default risk using the Lending Club dataset.
+Production-grade machine learning platform for predicting loan default risk using the Lending Club dataset
 
 
 
