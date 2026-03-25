@@ -8,7 +8,50 @@ function App() {
   const [fico, setFico] = useState("");
   const [result, setResult] = useState(null);
 
+  // Add missing state hooks for error and loading at the top level
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
   const handleSubmit = async () => {
+    setError("");
+
+    // Validation
+    if (!loanAmnt) {
+      setError("Loan Amount is required");
+      return;
+    }
+    if (!income) {
+      setError("Annual Income is required");
+      return;
+    }
+    if (!dti) {
+      setError("DTI is required");
+      return;
+    }
+    if (!fico) {
+      setError("FICO Score is required");
+      return;
+    }
+
+    if (isNaN(Number(loanAmnt)) || Number(loanAmnt) <= 0) {
+      setError("Loan Amount must be a positive number");
+      return;
+    }
+    if (isNaN(Number(income)) || Number(income) <= 0) {
+      setError("Annual Income must be a positive number");
+      return;
+    }
+    if (isNaN(Number(dti)) || Number(dti) < 0) {
+      setError("DTI must be a non-negative number");
+      return;
+    }
+    if (isNaN(Number(fico)) || Number(fico) < 0) {
+      setError("FICO Score must be a non-negative number");
+      return;
+    }
+
+    setLoading(true);
+
     try {
       const response = await axios.post("/api/v1/predict", {
         data: [
@@ -25,7 +68,9 @@ function App() {
       setResult(prediction);
     } catch (err) {
       console.error(err);
-      alert("Prediction failed");
+      setError("Prediction failed. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -40,6 +85,7 @@ function App() {
       />
       <br />
       <br />
+      {error && <p style={{ color: "red" }}>{error}</p>}
 
       <input
         placeholder="Annual Income"
@@ -65,7 +111,9 @@ function App() {
       <br />
       <br />
 
-      <button onClick={handleSubmit}>Predict</button>
+      <button onClick={handleSubmit} disabled={loading}>
+        {loading ? "Predicting..." : "Predict"}
+      </button>
 
       {result && (
         <div>
