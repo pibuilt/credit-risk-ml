@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Virtual env
+venv/
+
+# ML artifacts (NOT needed in container)
+mlruns/
+reports/
+
+# Notebooks, data, and misc
+data/
+notebooks/
+*.ipynb
+*.csv
+*.xlsx
+*.log
+*.tmp
+
+# Test files
+tests/
+*.test.*
+*.spec.*
+
+# Build and dist
+dist/
+build/
+*.egg-info/
+
+# Git
+.git
+
+# DVC cache (VERY IMPORTANT)
+.dvc/cache
+
+# OS
+.DS_Store
+Thumbs.db
