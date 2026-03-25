@@ -21,7 +21,8 @@ function App() {
         ],
       });
 
-      setResult(response.data);
+      const prediction = response.data.predictions[0];
+      setResult(prediction);
     } catch (err) {
       console.error(err);
       alert("Prediction failed");
@@ -69,7 +70,24 @@ function App() {
       {result && (
         <div>
           <h3>Result:</h3>
-          <pre>{JSON.stringify(result, null, 2)}</pre>
+          {result && (
+            <div>
+              <h3>Result:</h3>
+              <p>
+                <strong>Risk Score:</strong> {result.risk_score}
+              </p>
+              <p>
+                <strong>Risk Level:</strong> {result.risk_level}
+              </p>
+              <p>
+                <strong>Default Probability:</strong>{" "}
+                {result.default_probability}
+              </p>
+              <p>
+                <strong>Risk Cluster:</strong> {result.risk_cluster}
+              </p>
+            </div>
+          )}
         </div>
       )}
     </div>

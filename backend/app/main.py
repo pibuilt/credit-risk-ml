@@ -216,10 +216,27 @@ def predict(request: PredictionRequest, req: Request):
         model_service = get_model_service()
         explainer = get_explainer(model_service)
 
+
         df = build_full_dataframe(
             [item.model_dump() for item in request.data],
             model_service
         )
+
+        # Add risk_cluster column at inference
+        try:
+            # Get numeric features used for clustering
+            preprocessor = model_service.pipeline.named_steps["preprocessor"]
+            numeric_features = None
+            for name, transformer, cols in preprocessor.transformers_:
+                if name == "risk_cluster":
+                    numeric_features = cols
+                    risk_cluster_transformer = transformer
+                    break
+            if numeric_features is not None and risk_cluster_transformer is not None:
+                clusters = risk_cluster_transformer.transform(df[numeric_features])
+                df["risk_cluster"] = clusters.flatten()
+        except Exception as e:
+            logger.warning(f"Could not compute risk_cluster at inference: {e}")
 
         if df.empty:
             raise HTTPException(status_code=400, detail="Empty input data")

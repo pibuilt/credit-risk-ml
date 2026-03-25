@@ -74,15 +74,16 @@ class ModelService:
 
         return probs
 
+
     def predict_with_risk(self, input_df):
-
         probs = self.predict(input_df)
-
         results = []
 
-        for p in probs:
-            score = 850 - (p * 550)
+        # Try to get risk_cluster from input_df if it exists, else fill with None
+        risk_clusters = input_df["risk_cluster"].tolist() if "risk_cluster" in input_df.columns else [None] * len(input_df)
 
+        for p, rc in zip(probs, risk_clusters):
+            score = 850 - (p * 550)
             if score >= 750:
                 level = "Low Risk"
             elif score >= 650:
@@ -95,7 +96,8 @@ class ModelService:
             results.append({
                 "default_probability": float(p),
                 "risk_score": int(score),
-                "risk_level": level
+                "risk_level": level,
+                "risk_cluster": int(rc) if rc is not None else None
             })
 
         return results
