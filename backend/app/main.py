@@ -206,7 +206,7 @@ def get_metrics():
 # PREDICTION ENDPOINT
 # -----------------------------------
 
-@app.post("/api/v1/predict")
+@app.post("/v1/predict")
 def predict(request: PredictionRequest, req: Request):
 
     request_id = req.state.request_id
