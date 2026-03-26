@@ -5,10 +5,15 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
+      args:
+        - AWS_ACCESS_KEY_ID
+        - AWS_SECRET_ACCESS_KEY
     container_name: credit-risk-backend
     ports:
       - "8000:8000"
     restart: always
+    env_file:
+      - .env
 
   nginx:
     image: nginx:latest
