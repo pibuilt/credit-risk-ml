@@ -7,6 +7,6 @@ optuna
 shap
 joblib
 mlflow
-dvc
+dvc[s3]
 fastapi
 uvicorn
