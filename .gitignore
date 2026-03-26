@@ -28,3 +28,4 @@ mlflow.db
 .DS_Store
 Thumbs.db
 .vscode
+.env
