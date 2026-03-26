@@ -23,17 +23,41 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# install ONLY runtime dependency
+
+# install ONLY runtime dependency and DVC
 RUN apt-get update && apt-get install -y \
-    libgomp1 \
+    libgomp1 git \
     && rm -rf /var/lib/apt/lists/*
+RUN pip install --no-cache-dir dvc[s3]
+
 
 # copy installed python packages
 COPY --from=builder /install /usr/local
 
-# copy only backend app, models, and ml (not data, .git, etc.)
+
+
+# Copy DVC files and configs (from project root context)
+COPY .dvc .dvc
+COPY dvc.yaml dvc.yaml
+COPY dvc.lock dvc.lock
+COPY data/loan_2019_20.csv.dvc data/loan_2019_20.csv.dvc
+
+
+# Copy .git directory so DVC recognizes the repo
+COPY .git .git
+
+# Debug: list contents to verify .dvc and .git are present
+RUN ls -la /app && ls -la /app/.dvc && ls -la /app/.git
+
+
+# Pull models and data from DVC remote
+RUN dvc pull || exit 1
+
+# Remove .git to keep image clean
+RUN rm -rf .git
+
+# copy backend app and ml (models will be present after dvc pull)
 COPY backend/ ./backend/
-COPY models/ ./models/
 COPY ml/ ./ml/
 
 # expose port
