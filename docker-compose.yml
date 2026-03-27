@@ -21,6 +21,8 @@ services:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf
     depends_on:
       - backend
+    restart: always
 
   frontend:
     build: ./frontend
+    restart: always
