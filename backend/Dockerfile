@@ -22,7 +22,7 @@ RUN pip install --no-cache-dir --prefix=/install -r requirements.txt \
 
 FROM python:3.11-slim
 
-# Accept AWS credentials as build args
+# Accept AWS credentials as build args. Remvoe if using EC2 role for S3 access.
 ARG AWS_ACCESS_KEY_ID
 ARG AWS_SECRET_ACCESS_KEY
 ENV AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}

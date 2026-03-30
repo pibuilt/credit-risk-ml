@@ -5,7 +5,7 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
-      args:
+      args: #Remove if an ec2 role is used to provide access to s3
         - AWS_ACCESS_KEY_ID
         - AWS_SECRET_ACCESS_KEY
     expose:
