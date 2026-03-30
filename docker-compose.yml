@@ -8,6 +8,8 @@ services:
       args:
         - AWS_ACCESS_KEY_ID
         - AWS_SECRET_ACCESS_KEY
+    expose:
+      - "8000"
     container_name: credit-risk-backend
     restart: always
     env_file:
@@ -25,4 +27,7 @@ services:
 
   frontend:
     build: ./frontend
+    expose:
+      - "3000"
+    container_name: credit-risk-frontend
     restart: always
